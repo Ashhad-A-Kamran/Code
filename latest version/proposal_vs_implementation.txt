@@ -1,0 +1,54 @@
+RESEARCH PROPOSAL VS. CURRENT IMPLEMENTATION CROSS-CHECK
+
+=========================================================
+1. CORE CONCEPT AND AIM
+=========================================================
+Proposal: "Interactive Multi-Objective Optimization for Balancing Accuracy, Fairness, and Energy Efficiency in AI Models" ... "Interactive system enabling us to trade off accuracy, fairness, and energy efficiency dynamically while training"
+Implementation: MATCHES PERFECTLY. The application provides an endpoint to start training sessions and a web UI dashboard to dynamically pause, resume, and adjust weight parameters (slider bars) while the model is training.
+Difference: None. The core concept is fully realized in the codebase.
+
+=========================================================
+2. THE LOSS FUNCTION
+=========================================================
+Proposal: "implement a general-purpose function (a "loss function") used by the AI to learn that balances targets for accuracy, fairness, and energy efficiency, enabling us to specify their relative weight."
+Implementation: MATCHES PERFECTLY. In `backend/trainer.py`, the loss is computed as:
+`total_loss = (self.w_accuracy * loss_acc) + (self.w_fairness * loss_fair) + (self.w_energy * loss_energy)`
+Where `self.w_*` values are updated in real-time via the frontend sliders.
+Difference: None.
+
+=========================================================
+3. INTERACTIVE APPROACH (Human-in-the-loop vs AI Agent)
+=========================================================
+Proposal: "create an interactive approach (human-in-the-loop, where some individual fine-tunes them, or with another AI agent that makes smart fine-tuning) to finetune these objective priorities in real-time while training."
+Implementation: PARTIAL MATCH. The "human-in-the-loop" approach is fully implemented via the web dashboard (HTML/CSS/JS frontend). Users can manipulate sliders manually.
+Difference: The autonomous "AI agent" that makes smart fine-tuning decisions is not actively implemented in the current codebase. However, because the backend relies on an open REST API (`/api/command/`), it is "AI-ready"—an external script could easily be written to programmatically hit this endpoint.
+
+=========================================================
+4. DATASETS FOR FAIRNESS
+=========================================================
+Proposal: "We shall work with datasets like COMPAS and Adult Income dataset which are widely utilized to study bias in AI."
+Implementation: MATCHES PERFECTLY. The code actively uses the Adult Income dataset via `fairlearn.datasets.fetch_adult()`. It splits the data based on the sensitive feature 'sex' to compute Demographic Parity Difference (DPD).
+Difference: You only implemented the "Adult Income" dataset so far. COMPAS is not yet included in the code.
+
+=========================================================
+5. ENERGY TRACKING UTILITY
+=========================================================
+Proposal: "We will track the energy usage by the computer's GPU and CPU during training with utilities like CodeCarbon"
+Implementation: DEVIATION. The codebase does NOT use the CodeCarbon library. 
+Difference: Instead of CodeCarbon, you developed a custom tracking module (`libraries/power_tracker.py` -> `DynamicPowerTracker`). It identifies system hardware via `wmic` commands and estimates power consumption by looking at `psutil.cpu_percent()` combined with hardcoded TDP (Thermal Design Power) estimates (e.g., 65W, 45W, 100W). 
+
+=========================================================
+6. AI MODELS (Not explicitly detailed in proposal)
+=========================================================
+Proposal: Mentions training AI models to evaluate the metrics but doesn't explicitly restrict which models.
+Implementation: EXTENSION. The code gives you the ability to select between two distinct models via `models.py`:
+- Logistic Regression (Linear)
+- Deep Neural Network (Non-linear)
+Difference: This is a positive addition that allows you to compare how linear vs non-linear architectures respond to the dynamic multi-objective loss function.
+
+=========================================================
+SUMMARY OF ACTIONABLE DIFFERENCES TO ADDRESS (If you wish strict compliance):
+=========================================================
+1. The AI Autonomous Agent for fine-tuning has not been built yet (currently only human-driven).
+2. CodeCarbon was proposed but a custom heuristic power tracker was built instead. (You may want to either update the proposal to state you built a custom power estimation tracker, or replace `power_tracker.py` with `codecarbon`).
+3. Only the Adult dataset is active; COMPAS is missing if you intend to test multiple datasets.

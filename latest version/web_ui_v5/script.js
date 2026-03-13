@@ -120,7 +120,14 @@ function selectModel(mid) {
 }
 
 function updateCharts(mid) {
-    if (!historyData[mid] || historyData[mid].length === 0) return;
+    if (!historyData[mid] || historyData[mid].length === 0) {
+        Object.values(charts).forEach(c => {
+            c.data.labels = [];
+            c.data.datasets[0].data = [];
+            c.update();
+        });
+        return;
+    }
     const data = historyData[mid];
     const labels = data.map(d => d.epoch);
 
@@ -143,7 +150,7 @@ function updateCharts(mid) {
 
 async function pollModels() {
     try {
-        const res = await fetch(`${API_BASE}/models`);
+        const res = await fetch(`${API_BASE}/models?_t=${Date.now()}`);
         const models = await res.json();
 
         // Update Sidebar List
@@ -166,7 +173,7 @@ async function pollModels() {
             const statusInfo = models[activeModelId];
 
             // Poll Log
-            const logRes = await fetch(`${API_BASE}/logs/${activeModelId}`);
+            const logRes = await fetch(`${API_BASE}/logs/${activeModelId}?_t=${Date.now()}`);
             const log = await logRes.json();
 
             document.getElementById('kpi_status').innerText = statusInfo.status.toUpperCase();

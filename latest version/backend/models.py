@@ -22,3 +22,19 @@ class DeepNeuralNetwork(nn.Module):
         )
     def forward(self, x):
         return self.network(x)
+
+import torchvision.models as models
+
+class ResNet18Custom(nn.Module):
+    def __init__(self):
+        super(ResNet18Custom, self).__init__()
+        # Load a pretrained or unpretrained ResNet18 (unpretrained for faster local non-download, or pretrained if requested)
+        # Using pretrained=False to avoid massive downloads for synthetic tests
+        self.model = models.resnet18(pretrained=False)
+        # Modify the final fully connected layer for binary classification
+        num_ftrs = self.model.fc.in_features
+        self.model.fc = nn.Linear(num_ftrs, 1)
+        
+    def forward(self, x):
+        # return a sigmoid prob
+        return torch.sigmoid(self.model(x))

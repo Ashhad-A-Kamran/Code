@@ -93,21 +93,25 @@ class InteractiveTrainer:
             for epoch in range(self.total_epochs):
                 self.current_epoch = epoch + 1
                 
-                for q in self.queues.values():
-                    while not q.empty():
-                        cmd = q.get_nowait()
-                        if cmd['command'] == "pause_training": self.is_paused = True
-                        elif cmd['command'] == "resume_training": self.is_paused = False
-                        elif cmd['command'] == "stop_training": self.should_stop = True
-                        elif cmd['command'] == "update_weights":
-                            w = json.loads(cmd['args'])
-                            self.w_accuracy = w.get('accuracy', self.w_accuracy)
-                            self.w_fairness = w.get('fairness', self.w_fairness)
-                            self.w_energy = w.get('energy', self.w_energy)
+                def process_queues():
+                    for q in self.queues.values():
+                        while not q.empty():
+                            cmd = q.get_nowait()
+                            if cmd['command'] == "pause_training": self.is_paused = True
+                            elif cmd['command'] == "resume_training": self.is_paused = False
+                            elif cmd['command'] == "stop_training": self.should_stop = True
+                            elif cmd['command'] == "update_weights":
+                                w = json.loads(cmd['args'])
+                                self.w_accuracy = w.get('accuracy', self.w_accuracy)
+                                self.w_fairness = w.get('fairness', self.w_fairness)
+                                self.w_energy = w.get('energy', self.w_energy)
+
+                process_queues()
 
                 while self.is_paused and not self.should_stop:
                     self.status = "paused"
                     time.sleep(0.5)
+                    process_queues()
                 if self.should_stop: break
                 
                 self.status = "running"
