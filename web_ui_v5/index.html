@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOO v5 Engine</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation & Creation -->
+        <aside class="sidebar">
+            <h2 class="sys-title">MOO Controller</h2>
+            <div class="divider"></div>
+            
+            <div class="control-group">
+                <h3>Deploy Node</h3>
+                <input type="text" id="new_model_name" placeholder="Instance ID (e.g. Node_1)">
+                <input type="number" id="new_epochs" value="200" placeholder="Epoch Cycles">
+                <select id="new_model_type">
+                    <option value="logistic">Logistic Regression (Linear)</option>
+                    <option value="dnn">Deep Neural Network (Non-linear)</option>
+                </select>
+                <button class="btn-primary" onclick="createModel()">Initialize Node</button>
+            </div>
+
+            <div class="divider"></div>
+            
+            <div class="control-group">
+                <h3>Active Instances</h3>
+                <div id="model_list" class="model-list">
+                    <!-- Dynamic list of model cards goes here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace (Telemetry) -->
+        <main class="workspace" id="main_workspace">
+            <div class="empty-state" id="empty_state">
+                <h2>SYSTEM STANDBY</h2>
+                <p>Deploy or select a neural instance from the controller to initiate telemetry.</p>
+            </div>
+
+            <div class="dashboard" id="dashboard" style="display: none;">
+                <div class="kpi-header">
+                    <h1 id="view_model_id">Node: --</h1>
+                    <div class="kpi-container">
+                        <div class="kpi-box">
+                            <span class="kpi-label">STATUS</span>
+                            <span class="kpi-value" id="kpi_status">INIT</span>
+                        </div>
+                        <div class="kpi-box">
+                            <span class="kpi-label">EPOCH</span>
+                            <span class="kpi-value" id="kpi_epoch">0/0</span>
+                        </div>
+                        <div class="kpi-box">
+                            <span class="kpi-label">ACCURACY</span>
+                            <span class="kpi-value" id="kpi_acc">0.0%</span>
+                        </div>
+                        <div class="kpi-box">
+                            <span class="kpi-label">ENERGY (kWh)</span>
+                            <span class="kpi-value highlight" id="kpi_nrg">0.000000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-grid">
+                    <div class="chart-card">
+                        <span class="chart-title">Model Loss (Optimization Stance)</span>
+                        <canvas id="chartLoss"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <span class="chart-title">Fairness Integrity (DPD)</span>
+                        <canvas id="chartFairness"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <span class="chart-title">Bias Disparity (Sex Mean Diff)</span>
+                        <canvas id="chartBias"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <span class="chart-title">Cumulative Energy Draw</span>
+                        <canvas id="chartEnergy"></canvas>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Panel (Execution Context) -->
+        <aside class="right-panel" id="right_panel" style="display: none;">
+            <div class="control-card control-header">
+                <h3>Execution Override</h3>
+                <div class="btn-grid">
+                    <button class="btn-action" onclick="sendCommand('start_training')">Start Subroutine</button>
+                    <button class="btn-action" onclick="sendCommand('pause_training')">Pause</button>
+                    <button class="btn-action" onclick="sendCommand('resume_training')">Resume</button>
+                    <button class="btn-danger" onclick="sendCommand('stop_training')">Terminate</button>
+                </div>
+            </div>
+
+            <div class="control-card">
+                <h3>Tuning Parameters</h3>
+                
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <label>Accuracy Weight</label>
+                        <span id="val_acc">1.0</span>
+                    </div>
+                    <input type="range" id="w_acc" min="0" max="10" step="0.1" value="1.0" oninput="updateSliderVal('acc')">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <label>Fairness Weight</label>
+                        <span id="val_fair">0.5</span>
+                    </div>
+                    <input type="range" id="w_fair" min="0" max="10" step="0.1" value="0.5" oninput="updateSliderVal('fair')">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-header">
+                        <label>Energy Weight</label>
+                        <span id="val_nrg">0.5</span>
+                    </div>
+                    <input type="range" id="w_nrg" min="0" max="10" step="0.1" value="0.5" oninput="updateSliderVal('nrg')">
+                </div>
+
+                <button class="btn-primary" onclick="applyWeights()" style="margin-top: 15px;">Apply Parameters</button>
+            </div>
+
+            <div class="control-card danger-zone">
+                <button class="btn-danger-outline" onclick="deleteCurrentModel()">Destroy Instance</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

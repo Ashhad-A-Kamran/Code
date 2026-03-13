@@ -1,0 +1,17 @@
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+torch
+transformers
+fairlearn
+pyJoules
+codecarbon
+pymoo
+uvicorn
+fastapi
+python-multipart
+websockets
+streamlit
+requests
