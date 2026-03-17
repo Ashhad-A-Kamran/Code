@@ -14,9 +14,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from libraries.power_tracker import DynamicPowerTracker
 from models import LogisticRegression, DeepNeuralNetwork, ResNet18Custom
-from data_loader import get_dataloaders, get_synthetic_vision_dataloaders
-from fairness_roc import compute_roc_fairness
-from fairness_nsga2 import run_nsga2_fairness
+from data_loader import get_adult_dataloaders, get_synthetic_vision_dataloaders
 
 logger = logging.getLogger(__name__)
 
@@ -24,19 +22,10 @@ UPDATE_WEIGHTS_TYPE = "update_weights_type"
 PAUSE_RESUME_TYPE = "pause_resume_type"
 
 class InteractiveTrainer:
-    def __init__(
-        self,
-        model_id: str,
-        model_type: str,
-        total_epochs: int,
-        dataset_name: str = "adult",
-        fairness_method: str = "dpd",
-    ):
+    def __init__(self, model_id: str, model_type: str, total_epochs: int):
         self.model_id = model_id
-        self.model_type = model_type
+        self.model_type = model_type  
         self.total_epochs = total_epochs
-        self.dataset_name = dataset_name         # "adult" | "compass" | "german_credit"
-        self.fairness_method = fairness_method   # "dpd"   | "roc"    | "nsga2"
         self.current_epoch = 0
         self.status = "init"
         self.is_paused = False
@@ -47,84 +36,11 @@ class InteractiveTrainer:
         self.w_energy = 0.5
         self.latest_log = {}
         self.tracker = None
-
+        
         self.queues = {
             UPDATE_WEIGHTS_TYPE: queue.Queue(),
             PAUSE_RESUME_TYPE: queue.Queue(),
         }
-
-    # ------------------------------------------------------------------
-    # Helper: compute fairness score using the selected method
-    # ------------------------------------------------------------------
-    def _compute_fairness(self, test_data, model):
-        """
-        Returns (fairness_score, bias_score) using the configured method.
-        - "dpd"  : Demographic Parity Difference (existing method, fast)
-        - "roc"  : Reject Option Classification (XGBoost-based, medium)
-        - "nsga2": NSGA-II multi-objective optimization (slow, runs once
-                   at the end of training for comprehensive results)
-        """
-        X_test_df = test_data.get('X_test_df')
-        y_test = test_data['y_test']
-        sex_test = test_data['sex_test']
-
-        # ---- DPD (default, gradient-model based) ----
-        if self.fairness_method == "dpd" or X_test_df is None:
-            with torch.no_grad():
-                preds = []
-                chunk_size = 128
-                X_test_t = test_data['X_test_t']
-                for i in range(0, len(X_test_t), chunk_size):
-                    batch = X_test_t[i:i+chunk_size]
-                    out = model(batch)
-                    preds.extend((out.numpy() > 0.5).astype(int).flatten())
-                preds = np.array(preds)
-                acc = float(np.mean(preds == y_test))
-                try:
-                    dpd = float(demographic_parity_difference(
-                        y_test, preds, sensitive_features=sex_test
-                    ))
-                except:
-                    dpd = 0.0
-            return acc, dpd, dpd  # acc, fairness, bias
-
-        # ---- ROC ----
-        if self.fairness_method == "roc":
-            import pandas as pd
-            X_test_df = test_data.get('X_test_df')
-            y_ser = pd.Series(y_test)
-            result = compute_roc_fairness(
-                X_train=X_test_df,   # ROC trains its own XGBoost internally
-                y_train=y_ser,
-                X_test=X_test_df,
-                y_test=y_ser,
-                dataset_name=self.dataset_name,
-            )
-            acc = result.get("overall_accuracy", 0.0)
-            fairness = result.get("fairness_score", 0.0)
-            bias = result.get("bias_score", 0.0)
-            return acc, fairness, bias
-
-        # ---- NSGA-II ----
-        if self.fairness_method == "nsga2":
-            import pandas as pd
-            y_ser = pd.Series(y_test)
-            result = run_nsga2_fairness(
-                X_train=test_data['X_test_df'],
-                y_train=y_ser,
-                X_test=test_data['X_test_df'],
-                y_test=y_ser,
-                dataset_name=self.dataset_name,
-                pop_size=50,
-                n_evals=200,
-            )
-            acc = result.get("overall_accuracy", 0.0)
-            fairness = result.get("fairness_score", 0.0)
-            bias = result.get("bias_score", 0.0)
-            return acc, fairness, bias
-
-        # Fallback
-        return 0.0, 0.0, 0.0
 
     def train(self):
         try:
@@ -132,40 +48,38 @@ class InteractiveTrainer:
                 train_loader, test_data, _ = get_synthetic_vision_dataloaders()
                 model = ResNet18Custom()
             elif self.model_type == 'dnn':
-                train_loader, test_data, n_features = get_dataloaders(self.dataset_name)
+                train_loader, test_data, n_features = get_adult_dataloaders()
                 model = DeepNeuralNetwork(n_features)
             else:
-                train_loader, test_data, n_features = get_dataloaders(self.dataset_name)
+                train_loader, test_data, n_features = get_adult_dataloaders()
                 model = LogisticRegression(n_features)
-
+                
             self.X_test_t = test_data['X_test_t']
             self.y_test = test_data['y_test']
             self.sex_test = test_data['sex_test']
-            self._test_data = test_data  # store full dict for fairness methods
-            self._train_loader = train_loader
-
+                
             optimizer = optim.Adam(model.parameters(), lr=0.01)
             criterion = nn.BCELoss()
-
+            
             self.tracker = DynamicPowerTracker(self.model_id)
             self.tracker.start()
-
+            
             self.status = "init"
-
+            
             start_time = time.time()
             total_elapsed_time = 0.0
 
             while not self.start_event.is_set() and not self.should_stop:
                 time.sleep(0.5)
 
-            if self.should_stop:
+            if self.should_stop: 
                 if self.tracker: self.tracker.stop()
                 return
 
             self.status = "running"
             for epoch in range(self.total_epochs):
                 self.current_epoch = epoch + 1
-
+                
                 def process_queues():
                     for q in self.queues.values():
                         while not q.empty():
@@ -184,21 +98,21 @@ class InteractiveTrainer:
                 while self.is_paused and not self.should_stop:
                     self.status = "paused"
                     time.sleep(0.5)
-                    start_time += 0.5
+                    start_time += 0.5 # Shift start time forward so pause doesn't add to elapsed
                     process_queues()
                 if self.should_stop: break
-
+                
                 self.status = "running"
-
+                
                 total_loss_val = 0.0
                 total_bias_val = 0.0
-
+                
                 model.train()
                 for batch_idx, (batch_X, batch_y, batch_priv, batch_unpriv) in enumerate(train_loader):
                     optimizer.zero_grad()
                     outputs = model(batch_X)
                     loss_acc = criterion(outputs, batch_y)
-
+                    
                     if batch_priv.any() and batch_unpriv.any():
                         p_mean = torch.mean(outputs[batch_priv])
                         u_mean = torch.mean(outputs[batch_unpriv])
@@ -207,33 +121,33 @@ class InteractiveTrainer:
                     else:
                         loss_fair = torch.tensor(0.0)
                         batch_bias = 0.0
-
+                        
                     l2_reg = torch.tensor(0.)
                     for param in model.parameters():
                         l2_reg += torch.norm(param)
                     loss_energy = l2_reg
-
+                    
                     batch_loss = (self.w_accuracy * loss_acc) + (self.w_fairness * loss_fair) + (self.w_energy * loss_energy)
                     batch_loss.backward()
                     optimizer.step()
-
+                    
                     total_loss_val += batch_loss.item()
                     total_bias_val += batch_bias
-
+                    
+                    # Update elapsed time
                     if not self.is_paused:
                         total_elapsed_time = time.time() - start_time
-
+                        
+                    # Calculate intermittent power draw
                     power_w, energy_kwh = self.tracker.get_power_energy()
 
                     self.latest_log = {
-                        "epoch": self.current_epoch,
+                        "epoch": self.current_epoch, 
                         "total_epochs": self.total_epochs,
                         "iteration": batch_idx + 1,
                         "total_iterations": len(train_loader),
                         "model_type": self.model_type,
-                        "dataset": self.dataset_name,
-                        "fairness_method": self.fairness_method,
-                        "accuracy": getattr(self, "last_acc", 0.0),
+                        "accuracy": getattr(self, "last_acc", 0.0), # Updated below
                         "fairness": getattr(self, "last_dpd", 0.0),
                         "bias": float(batch_bias),
                         "loss": float(batch_loss.item()),
@@ -242,64 +156,47 @@ class InteractiveTrainer:
                         "elapsed_time": float(total_elapsed_time)
                     }
 
-                # --- Per-epoch evaluation ---
                 model.eval()
-
-                # For DPD (fast, gradient-model based):
-                if self.fairness_method == "dpd":
-                    with torch.no_grad():
-                        preds = []
-                        chunk_size = 128
-                        for i in range(0, len(self.X_test_t), chunk_size):
-                            batch = self.X_test_t[i:i+chunk_size]
-                            out = model(batch)
-                            preds.extend((out.numpy() > 0.5).astype(int).flatten())
-                        preds = np.array(preds)
-                        acc = float(np.mean(preds == self.y_test))
-                        try:
-                            dpd = float(demographic_parity_difference(
-                                self.y_test, preds, sensitive_features=self.sex_test
-                            ))
-                        except:
-                            dpd = 0.0
-                        bias_score = dpd
-                else:
-                    # ROC and NSGA-II: run once every N epochs to avoid extreme slowdown
-                    interval = 5 if self.fairness_method == "roc" else 10
-                    if self.current_epoch % interval == 0 or self.current_epoch == self.total_epochs:
-                        acc, dpd, bias_score = self._compute_fairness(self._test_data, model)
-                    else:
-                        acc = getattr(self, "last_acc", 0.0)
-                        dpd = getattr(self, "last_dpd", 0.0)
-                        bias_score = getattr(self, "last_bias", 0.0)
-
-                self.last_acc = acc
-                self.last_dpd = dpd
-                self.last_bias = bias_score
+                with torch.no_grad():
+                    preds = []
+                    chunk_size = 128
+                    for i in range(0, len(self.X_test_t), chunk_size):
+                        batch = self.X_test_t[i:i+chunk_size]
+                        out = model(batch)
+                        preds.extend((out.numpy() > 0.5).astype(int).flatten())
+                    preds = np.array(preds)
+                    
+                    acc = np.mean(preds == self.y_test)
+                    try:
+                        dpd = demographic_parity_difference(self.y_test, preds, sensitive_features=self.sex_test)
+                    except:
+                        dpd = 0.0
+                        
+                    # Save for next iterations
+                    self.last_acc = float(acc)
+                    self.last_dpd = float(dpd)
 
                 power_w, energy_kwh = self.tracker.get_power_energy()
 
                 self.latest_log = {
-                    "epoch": self.current_epoch,
+                    "epoch": self.current_epoch, 
                     "total_epochs": self.total_epochs,
                     "iteration": "Done",
                     "total_iterations": len(train_loader),
                     "model_type": self.model_type,
-                    "dataset": self.dataset_name,
-                    "fairness_method": self.fairness_method,
-                    "accuracy": acc,
-                    "fairness": dpd,
+                    "accuracy": float(acc), 
+                    "fairness": float(dpd), 
                     "bias": float(total_bias_val / len(train_loader)),
                     "loss": float(total_loss_val / len(train_loader)),
                     "energy_consumed": float(energy_kwh),
                     "power_draw": float(power_w),
                     "elapsed_time": float(total_elapsed_time)
                 }
-                time.sleep(0.05)
+                time.sleep(0.05) 
 
             self.status = "finished"
             if self.tracker:
                 self.tracker.stop()
         except Exception as e:
-            logger.error(f"Error in trainer {self.model_id}: {e}", exc_info=True)
+            logger.error(f"Error in trainer {self.model_id}: {e}")
             self.status = "error"

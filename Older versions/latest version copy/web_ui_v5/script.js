@@ -54,21 +54,12 @@ async function createModel() {
     const name = document.getElementById('new_model_name').value.trim() || `Node_${Date.now()}`;
     const epochs = document.getElementById('new_epochs').value;
     const type = document.getElementById('new_model_type').value;
-    const dataset = document.getElementById('new_dataset').value;
-    const fairnessMethod = document.getElementById('new_fairness_method').value;
-
-    // Warn user about slow methods
-    if (fairnessMethod === 'nsga2') {
-        showToast('⚠️ NSGA-II selected: fairness will update every 10 epochs (computationally heavy)');
-    } else if (fairnessMethod === 'roc') {
-        showToast('ℹ️ ROC selected: fairness will update every 5 epochs');
-    }
 
     try {
-        const res = await fetch(`${API_BASE}/create/${name}/${type}/${epochs}/${dataset}/${fairnessMethod}`, { method: 'POST' });
+        const res = await fetch(`${API_BASE}/create/${name}/${type}/${epochs}`, { method: 'POST' });
         const data = await res.json();
         if (data.status === "started") {
-            showToast(`Instance ${name} initialized [${dataset} / ${fairnessMethod.toUpperCase()}]`);
+            showToast(`Instance ${name} initialized`);
             historyData[name] = [];
             selectModel(name);
             pollModels();
@@ -239,12 +230,9 @@ async function pollModels() {
             const div = document.createElement('div');
             div.className = `model-card ${mid === activeModelId ? 'active' : ''}`;
             div.onclick = () => selectModel(mid);
-            const datasetLabel = (info.dataset || 'adult').replace('_', ' ');
-            const methodLabel = (info.fairness_method || 'dpd').toUpperCase();
             div.innerHTML = `
                 <span class="mc-name">${mid}</span>
                 <span class="mc-status ${info.status}">${info.status.toUpperCase()}</span>
-                <span style="font-size:0.65rem; color: var(--text-muted); margin-top: 2px;">${datasetLabel} · ${methodLabel}</span>
             `;
             listContainer.appendChild(div);
         }

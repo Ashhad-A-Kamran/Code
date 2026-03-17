@@ -28,43 +28,21 @@ class InteractiveServer:
         @self.app.get("/api/models")
         async def list_models():
             return {mid: {
-                "status": t.status,
-                "epoch": t.current_epoch,
+                "status": t.status, 
+                "epoch": t.current_epoch, 
                 "total": t.total_epochs,
-                "type": t.model_type,
-                "dataset": t.dataset_name,
-                "fairness_method": t.fairness_method,
+                "type": t.model_type
             } for mid, t in self.trainers.items()}
 
-        @self.app.post("/api/create/{model_id}/{model_type}/{epochs}/{dataset}/{fairness_method}")
-        async def create_trainer(
-            model_id: str,
-            model_type: str,
-            epochs: int,
-            dataset: str = "adult",
-            fairness_method: str = "dpd",
-            background_tasks: BackgroundTasks = None,
-        ):
+        @self.app.post("/api/create/{model_id}/{model_type}/{epochs}")
+        async def create_trainer(model_id: str, model_type: str, epochs: int, background_tasks: BackgroundTasks):
             if model_id in self.trainers and self.trainers[model_id].status not in ["finished", "error"]:
                 return {"status": "already_running"}
-
-            trainer = InteractiveTrainer(
-                model_id=model_id,
-                model_type=model_type,
-                total_epochs=epochs,
-                dataset_name=dataset,
-                fairness_method=fairness_method,
-            )
+            
+            trainer = InteractiveTrainer(model_id, model_type, epochs)
             self.trainers[model_id] = trainer
             background_tasks.add_task(trainer.train)
-            return {
-                "status": "started",
-                "model_id": model_id,
-                "type": model_type,
-                "epochs": epochs,
-                "dataset": dataset,
-                "fairness_method": fairness_method,
-            }
+            return {"status": "started", "model_id": model_id, "type": model_type, "epochs": epochs}
 
         @self.app.get("/api/logs/{model_id}")
         async def get_log(model_id: str):
@@ -103,12 +81,3 @@ class InteractiveServer:
         @self.app.get("/")
         async def serve_index():
             return FileResponse(os.path.join(ui_path, "index.html"))
-
-# Instantiate the server and expose the FastAPI app instance globally
-# This allows uvicorn to find the 'app' module attribute.
-server = InteractiveServer("127.0.0.1", 5000)
-app = server.app
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=5000)
