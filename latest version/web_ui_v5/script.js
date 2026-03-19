@@ -50,11 +50,28 @@ function updateSliderVal(type) {
     document.getElementById(`val_${type}`).innerText = parseFloat(document.getElementById(`w_${type}`).value).toFixed(1);
 }
 
+// Handle UI changes when model type is selected
+function handleModelChange() {
+    const type = document.getElementById('new_model_type').value;
+    const container = document.getElementById('dataset_container');
+    if (type === 'resnet') {
+        container.style.display = 'none';
+    } else {
+        container.style.display = 'block';
+    }
+}
+
 async function createModel() {
     const name = document.getElementById('new_model_name').value.trim() || `Node_${Date.now()}`;
     const epochs = document.getElementById('new_epochs').value;
     const type = document.getElementById('new_model_type').value;
-    const dataset = document.getElementById('new_dataset').value;
+    
+    // If ResNet is selected, use a fixed mode for the dataset
+    let dataset = document.getElementById('new_dataset').value;
+    if (type === 'resnet') {
+        dataset = 'synthetic_vision'; 
+    }
+    
     const fairnessMethod = document.getElementById('new_fairness_method').value;
 
     // Warn user about slow methods

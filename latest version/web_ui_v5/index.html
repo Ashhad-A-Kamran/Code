@@ -16,24 +16,37 @@
             
             <div class="control-group">
                 <h3>Deploy Node</h3>
-                <input type="text" id="new_model_name" placeholder="Instance ID (e.g. Node_1)">
-                <input type="number" id="new_epochs" value="200" placeholder="Epoch Cycles">
-                <select id="new_model_type">
+                
+                <div class="field-label">Instance ID</div>
+                <input type="text" id="new_model_name" placeholder="e.g. Node_1">
+                
+                <div class="field-label">Epoch Cycles</div>
+                <input type="number" id="new_epochs" value="200">
+                
+                <div class="field-label">Architecture</div>
+                <select id="new_model_type" onchange="handleModelChange()">
                     <option value="logistic">Logistic Regression (Linear)</option>
                     <option value="dnn">Deep Neural Network (Non-linear)</option>
-                    <option value="resnet">ResNet-18 (Vision/Synthetic)</option>
+                    <option value="resnet">ResNet-18 (Computer Vision)</option>
                 </select>
-                <select id="new_dataset">
-                    <option value="adult">Dataset: Adult Income</option>
-                    <option value="compass">Dataset: COMPASS (ProPublica)</option>
-                    <option value="german_credit">Dataset: German Credit</option>
-                </select>
+                
+                <div id="dataset_container">
+                    <div class="field-label">Target Dataset</div>
+                    <select id="new_dataset">
+                        <option value="adult">Adult Income</option>
+                        <option value="compass">COMPASS (ProPublica)</option>
+                        <option value="german_credit">German Credit</option>
+                    </select>
+                </div>
+
+                <div class="field-label">Fairness Subroutine</div>
                 <select id="new_fairness_method">
-                    <option value="dpd">Fairness: DPD (Fast, Default)</option>
-                    <option value="roc">Fairness: ROC (Reject Option Classification)</option>
-                    <option value="nsga2">Fairness: NSGA-II (Multi-Objective Pareto)</option>
+                    <option value="dpd">DPD (Standard / Fairlearn)</option>
+                    <option value="roc">ROC (Reject Option Classification)</option>
+                    <option value="nsga2">NSGA-II (Evolutionary Pareto)</option>
                 </select>
-                <button class="btn-primary" onclick="createModel()">Initialize Node</button>
+                
+                <button class="btn-primary" onclick="createModel()" style="margin-top:10px;">Initialize Node</button>
             </div>
 
 

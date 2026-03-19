@@ -62,7 +62,9 @@ class DynamicPowerTracker:
         self.last_time = now
         
         try:
-            cpu_util = psutil.cpu_percent() / 100.0 if psutil else 0.5
+            # Use process-specific CPU tracking instead of global
+            self.process = psutil.Process()
+            cpu_util = self.process.cpu_percent() / 100.0 if psutil else 0.5
         except:
             cpu_util = 0.5
             

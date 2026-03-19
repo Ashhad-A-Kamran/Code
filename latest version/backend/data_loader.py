@@ -219,9 +219,10 @@ def get_synthetic_vision_dataloaders(batch_size=64):
 def get_dataloaders(dataset_name: str, batch_size: int = 256):
     """Return (train_loader, test_data, n_features) for the given dataset name."""
     loaders = {
-        "adult":         get_adult_dataloaders,
-        "compass":       get_compass_dataloaders,
-        "german_credit": get_german_credit_dataloaders,
+        "adult":            get_adult_dataloaders,
+        "compass":          get_compass_dataloaders,
+        "german_credit":    get_german_credit_dataloaders,
+        "synthetic_vision": get_synthetic_vision_dataloaders,
     }
     fn = loaders.get(dataset_name)
     if fn is None:

@@ -69,9 +69,19 @@ input, select {
     color: var(--text-main);
     padding: 10px;
     border-radius: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 5px;
     font-family: var(--font-mono);
     box-sizing: border-box;
+}
+
+.field-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-top: 10px;
+    margin-bottom: 3px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 input:focus, select:focus {
