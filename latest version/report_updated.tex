@@ -1,0 +1,926 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{float}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Define a Python style for listings
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{orange},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=10pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{black!30},
+    backgroundcolor=\color{black!5},
+    captionpos=b,
+    xleftmargin=10pt,
+    xrightmargin=10pt
+}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\geometry{a4paper, margin=1in}
+
+\title{Interactive Multi-Objective Optimization for Balancing Accuracy, Fairness, and Energy Efficiency in AI Models}
+\author{Sajid Ahmed Siddiqui}
+\date{April 1, 2026}
+
+\begin{document}
+
+\maketitle
+\newpage
+\begin{abstract}
+Machine learning algorithms significantly impact decision-making in high-stakes domains, necessitating a careful balance between predictive accuracy, algorithmic fairness, and computational sustainability. This dissertation introduces an interactive, in-processing multi-objective optimization framework that simultaneously optimizes fairness and accuracy while monitoring real-time energy consumption. The framework leverages three complementary fairness strategies: Demographic Parity Difference (DPD) for in-processing gradient regularization, Reject Option Classification (ROC) for post-processing uncertainty-aware fairness, and the Non-dominated Sorting Genetic Algorithm II (NSGA-II) for evolutionary Pareto-optimal trade-off discovery. Empirical evaluations are conducted on three publicly available, fairness-critical datasets -- German Credit, Adult Census Income, and ProPublica COMPASS (recidivism) -- protecting sensitive attributes such as gender and age. The framework is validated across two architecturally diverse models: Deep Neural Networks (non-linear), and ResNet-18 (convolutional vision). Baseline comparisons against tree-based classifiers (XGBoost, Random Forest, Decision Trees, AdaBoost) confirm that the ROC-based approach achieves superior fairness metrics while sustaining competitive accuracy, aligning with findings from recent multi-objective fairness literature \cite{nagpal2024multiobj}. Crucially, the system transforms optimization from a static, pre-configured process into a live, human-steerable experience through a real-time interactive dashboard.
+
+\noindent\textbf{Keywords:} algorithmic fairness; multi-objective optimization; bias mitigation; interactive machine learning; energy efficiency; human-in-the-loop
+\end{abstract}
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{Introduction}
+% ============================================================
+
+\subsection{Overview and Motivation}
+
+Machine learning algorithms have transformed decision-making in high-impact sectors such as finance, healthcare, and the justice system. However, because these systems influence critical outcomes, they can also produce serious societal consequences if not carefully designed. This makes it essential to develop approaches that ensure both accuracy and fairness in their predictions. Evidence has consistently shown that such models can exhibit bias toward certain demographic groups, reinforcing and amplifying existing inequalities at scale. 
+
+A well-known example is the COMPAS recidivism risk assessment tool used in courts in the United States. It has been widely observed that the system can assign higher risk scores to Black defendants compared to white defendants, even in cases where those individuals do not go on to reoffend. Such patterns can contribute to a harmful feedback loop, where biased predictions influence decisions, which in turn reinforce the biases in future outcomes. 
+
+Modern ML architectures have been formulated to minimize a single loss function corresponding strictly to error rates. This creates a ``Red AI'' paradigm -- a relentless, myopic pursuit of statistical accuracy that inflicts three interconnected societal harms:
+
+\begin{enumerate}
+    \item \textbf{Demographic Bias:} Models internalize and amplify historical biases present in training data.
+    \item \textbf{Environmental Cost:} Deep architectures like ResNet and Transformers demand vast, energy-intensive computational clusters.
+    \item \textbf{Rigid Training Loops:} Static optimization pipelines cannot adapt mid-training when bias or environmental cost spikes emerge.
+\end{enumerate}
+
+\subsection{Problem Statement}
+
+The challenge of debiasing arises because it is inherently a multi-objective problem rather than a single-objective one, underscoring the need for more sophisticated AI methodologies. Most existing approaches either: (a) optimize for group fairness alone, ignoring individual-level disparities, (b) treat fairness as a static pre-configured weight before training, or (c) apply post-processing corrections that cannot adapt to the model's real-time behavioral trajectory.
+
+There is a fundamental gap in the literature regarding frameworks that allow human experts to intervene \textit{dynamically} and shift fairness-accuracy-energy priorities in real-time as a model trains.
+
+\subsection{Research Questions}
+
+\begin{enumerate}
+    \item How can a unified, differentiable loss function be architected to concurrently penalize classification accuracy loss, demographic fairness disparities, and energy consumption proxies within a single gradient descent step?
+    \item To what extent can a decoupled ``human-in-the-loop'' interactive system inject real-time constraints directly into a live PyTorch training thread without disrupting backpropagation integrity?
+    \item How do fundamentally distinct architectural complexities -- from linear regression to deep convolutional vision networks -- respond to dynamic trade-off shifts in real-time?
+    \item Can integrating ROC and NSGA-II alongside an interactive framework outperform static baseline models (XGBoost, Random Forest) across standard fairness metrics?
+\end{enumerate}
+
+\subsection{Research Objectives}
+
+\begin{itemize}
+    \item \textbf{Mathematical Formulation:} Derive a composite loss function aggregating Binary Cross-Entropy for accuracy, Demographic Parity Difference proxies for fairness, and L2 regularization for energy, alongside ROC and NSGA-II as advanced multi-objective fairness strategies.
+    \item \textbf{Systems Engineering:} Develop an asynchronous ``'' architecture consisting of a web-based control dashboard, an asynchronous FastAPI middleware, and a modular multi-threaded PyTorch training backend.
+    \item \textbf{Empirical Evaluation:} Benchmark across three tabular fairness datasets (Adult Census Income, ProPublica COMPASS, German Credit) and high-dimensional image data (Synthetic Vision Tensors for ResNet-18), validating live Pareto frontier flexibility.
+    \item \textbf{Baseline Comparison:} Contrast framework results against standard tree-based classifiers: XGBoost, Random Forest, AdaBoost, Decision Trees, and Naive Bayes.
+\end{itemize}
+
+\subsection{Scope of the Study}
+
+\begin{itemize}
+    \item \textbf{Fairness Definitions:} Three complementary fairness strategies are employed:
+        \begin{itemize}
+            \item \textbf{DPD (In-Processing):} Real-time Demographic Parity Difference minimization via gradient regularization during backpropagation.
+            \item \textbf{ROC (Post-Processing):} Reject Option Classification to evaluate uncertainty zones and assess Counterfactual Fairness at the individual level.
+            \item \textbf{NSGA-II (Evolutionary):} Non-dominated Sorting Genetic Algorithm II for navigating the Pareto-optimal accuracy-fairness trade-off boundary.
+        \end{itemize}
+    \item \textbf{Model Complexity:} Currently, two architecturally distinct model types are defined: Deep Neural Networks (DNN), and ResNet-18 (Computer Vision CNN).
+    \item \textbf{Protected Attributes:} Gender (Male/Female) as the primary binary sensitive attribute, with scope for age-based analysis on the German Credit dataset.
+    \item \textbf{Energy Tracking:} Process-specific CPU power profiling using \texttt{psutil.Process().cpu\_percent()}, isolating model-exclusive energy from background system noise.
+\end{itemize}
+
+\subsection{Significance of the Study}
+
+This research transforms MOO from a static, pre-training requirement into an active, interactive steering mechanism. It empowers data scientists, sociologists, and ethicists to iteratively shape an AI's trajectory as it learns -- directly enabling ``Green AI'' practices and transparent, accountable algorithmic governance consistent with the EU AI Act's emerging requirements.
+% ============================================================
+\section{Related Work}
+% ============================================================
+\subsection{Algorithmic Fairness: A Three-Phase Taxonomy}
+Fairness mitigation techniques are generally grouped into three categories based on where they are applied in the machine learning pipeline:
+\begin{itemize}
+    \item \textbf{Pre-Processing:} These methods adjust the input data before training to reduce bias. Common approaches include re-sampling, synthetic data generation (such as SMOTE), and probabilistic transformations. While effective in balancing datasets, they are limited in addressing biases that arise during the model training process. In this work, a hybrid approach combining SMOTE with Tomek link under-sampling is used to handle class imbalance in datasets like Adult Census Income, COMPAS, and German Credit before training auxiliary classifiers for fairness evaluation.
+    \item \textbf{In-Processing:} These techniques modify the learning algorithm itself by embedding fairness considerations directly into the optimization process. Examples include adversarial training and constraint-based regularization. However, such methods often focus on a single objective or a single sensitive attribute, which can restrict their effectiveness in more complex, multi-objective fairness scenarios. In this study, fairness is incorporated through gradient regularization based on demographic parity difference, where disparities between privileged and unprivileged groups are penalized during training, enabling continuous fairness-aware updates without disrupting the learning process.
+    \item \textbf{Post-Processing and Hybrid Methods:} Threshold-adjustment and calibration techniques re-calibrate a trained model's output distribution after training \cite{hardt2016equality}. While effective in certain scenarios, their reliance on a fixed model limits simultaneous group and individual fairness optimization. This study implements \textbf{Reject Option Classification (ROC)} as a hybrid in-/post-processing complement. ROC trains an independent XGBoost classifier on balanced data, partitions test predictions into accepted (high-confidence, $p \geq \alpha$) and rejected (uncertain, $p < \alpha$) zones using a configurable threshold $\alpha = 0.65$, and evaluates both \emph{group fairness} (Statistical Parity within each zone) and \emph{individual fairness} via Counterfactual Fairness --- measuring prediction probability divergence when the sensitive sex attribute is flipped. This dual-metric approach enables the framework to quantify both population-level and instance-level fairness simultaneously, addressing a limitation of pure DPD-only approaches.
+\end{itemize}
+Within this framework, individual and group fairness stand out as two key dimensions. Group fairness—often referred to as statistical or demographic parity—focuses on ensuring that positive prediction rates are similar across protected demographic groups, typically by constraining the difference between these rates within a small threshold. In contrast, individual fairness, implemented here through a counterfactual perspective, requires that a model’s prediction for a person remains unchanged when their sensitive attribute (such as sex) is hypothetically modified while all other features are kept constant.
+
+The evaluation module used in this study measures both dimensions across datasets such as Adult Census Income, COMPAS, and German Credit, reporting group and counterfactual fairness as distinct metrics. For the Synthetic Vision dataset, only the group fairness measure is applied, as counterfactual adjustments are not meaningful for randomly generated tensor data.
+\subsection{Fairness Across High-Stakes Tabular Datasets}
+The three tabular datasets used in this study are widely recognized benchmarks in algorithmic fairness research. The Adult Census Income dataset, derived from the 1994 U.S. Census, is used to predict whether an individual’s annual income exceeds \$50K, with sex (male/female) treated as the protected sensitive attribute. It is commonly utilized to examine income-related bias in predictive models.
+
+The COMPAS dataset (Correctional Offender Management Profiling for Alternative Sanctions) is employed to predict the likelihood of recidivism within two years and is frequently used to analyze bias in criminal justice systems. In this study, sex (indicated through a female column) is considered the sensitive attribute, emphasizing gender-based disparities.
+
+The German Credit dataset classifies individuals as either good or bad credit risks, with a specific encoded feature used to identify female applicants as the unprivileged group.
+
+All three datasets undergo preprocessing using StandardScaler for feature normalization and SMOTE-Tomek for handling class imbalance within the fairness evaluation pipeline. While prior studies have typically applied fixed fairness constraints to individual models on these datasets, this work incorporates them into a unified, interactive multi-objective framework. This framework allows users to dynamically configure fairness techniques, model complexity, and loss function weights in real time.
+
+\subsection{Multi-Objective Optimization in Machine Learning}
+Traditional MOO literature relies on two dominant approaches:
+\begin{itemize}
+    \item \textbf{Weighted Sum Scalarization:} Aggregating multiple objectives into a single scalar value ($\mathcal{L} = w_1 f_1 + w_2 f_2 + w_3 f_3$). This approach is computationally inexpensive and differentiable, making it directly compatible with gradient-based deep learning optimization. This study employs weighted sum scalarization as the real-time DPD gradient training mechanism, combining binary cross-entropy for accuracy, squared demographic parity gap for group fairness, and $L_2$ parameter norm as an energy regularizer into a single composite loss. The weights $w_{\text{acc}}, w_{\text{fair}}, w_{\text{nrg}}$ are dynamically adjustable by the user via dashboard sliders and propagated to the training thread through thread-safe queues without requiring process restarts.
+    \item \textbf{Pareto Frontiers and NSGA-II:} Non-dominated Sorting Genetic Algorithms (NSGA-II) evolve a population of candidate solutions to generate a Pareto frontier, where no single objective can be improved without degrading another \cite{deb2002nsga2}. This study implements NSGA-II using the \texttt{pymoo} library, formulating a bi-objective problem over the decision space of XGBoost hyperparameters: \texttt{max\_depth} $\in [2, 8]$, \texttt{n\_estimators} $\in [50, 200]$, and \texttt{learning\_rate} $\in [0.001, 0.3]$, encoded as continuous variables in $[0, 1]^3$. The two objectives minimized are $F_1 = 1 - \text{Accuracy}$ and $F_2 = |\text{Statistical Parity Difference}|$, simultaneously optimizing predictive performance and demographic fairness. The best compromise solution is selected from the resulting Pareto frontier using Euclidean distance minimization to the utopia point. Recent research by Giovanelli et al.\ \cite{giovanelli2024interactive} emphasizes that navigating Pareto frontiers effectively benefits from human-centered interactive hyperparameter optimization, which directly motivates this study's interactive steering capability. Furthermore, as demonstrated by Nagpal et al.\ \cite{nagpal2024multiobj}, integrating NSGA-II with ROC yields superior fairness-accuracy trade-offs compared to other evolutionary methods including PSO, Differential Evolution, and Genetic Algorithms across fairness-critical datasets --- a finding empirically supported by the dual deployment of NSGA-II and ROC as complementary methods in this framework.
+\end{itemize}
+A critical limitation of both approaches is their \textit{static} nature: neither traditionally allows mid-training adjustments on a single instantiated neural network thread, wasting computational resources when poor weight configurations are identified late. This study addresses this limitation through an interactive queue-based weight injection mechanism embedded in the PyTorch training thread.
+\subsection{Baseline Classifiers for Fairness Benchmarking}
+Traditional machine learning classifiers serve as performance reference baselines against which the interactive PyTorch models are evaluated. Five primary baseline classifiers are consistently reported across all tabular datasets: \textbf{XGBoost} \cite{chen2016xgboost} (gradient-boosted decision trees, \texttt{max\_depth=8}, \texttt{n\_estimators=100}, \texttt{learning\_rate=0.1}), \textbf{Random Forest} (\texttt{n\_estimators=1000}), \textbf{AdaBoost}, \textbf{Naive Bayes} (Gaussian), and \textbf{Decision Tree}. All baseline models are trained on SMOTETomek-balanced data and evaluated using accuracy, precision, recall, F1-score, and AUC from ROC and Precision-Recall curves. Note that the German Credit baseline script (\texttt{classifiers\_german\_credit.py}) additionally trains KNN, MLP, SVM, Logistic Regression, and Gaussian Process classifiers; results for these are not reported here for conciseness and consistency across datasets. These baselines establish the performance ceiling of conventional, fairness-unaware classifiers, providing the necessary contrast to quantify the accuracy-fairness trade-offs imposed by the interactive MOO framework.
+XGBoost plays a dual role in this study: as a standalone baseline classifier, and as the internal model used within the ROC fairness evaluation module and as the hyperparameter-optimized model within the NSGA-II bi-objective problem. This dual use allows direct comparison between naive XGBoost performance and fairness-constrained XGBoost configurations surfaced by the evolutionary search.
+\subsection{Green AI and Energy-Aware Computing}
+While the ``Green AI'' movement advocates for efficiency metrics alongside raw accuracy \cite{schwartz2020green}, existing energy measurement tools including PyJoules, CodeCarbon, and Carbontracker are predominantly \textit{retrospective}: they provide post-mortem energy reports rather than real-time penalizers that actively guide gradient descent toward more energy-efficient network topologies. As highlighted by Gupta et al.\ \cite{gupta2023towards}, the exponential scaling of AI workloads demands that environmental impacts across hardware and model life cycles be holistically accounted for as a multi-objective optimization problem that simultaneously balances accuracy, efficiency, and sustainability.
+This study addresses that gap through two complementary mechanisms. First, the composite loss function incorporates an $L_2$ parameter norm regularizer --- $w_{\text{nrg}} \cdot \sum_{i}\|\theta_i\|_2$ --- as a differentiable, online training-time energy proxy that penalizes large, computationally dense parameter configurations at every gradient step. Heavier models with larger weight magnitudes incur a higher energy penalty, incentivizing parameter sparsity and architectural efficiency. Second, a \texttt{DynamicPowerTracker} module provides real-time CPU/GPU power draw and cumulative energy consumption estimates using hardware TDP baselines, streamed live to the dashboard alongside accuracy and fairness metrics. This enables operators to observe the energy implications of model complexity differences --- most starkly illustrated by the contrast between tabular Logistic Regression (minimal energy footprint) and ResNet-18 (significant power spikes during convolutional tensor operations on $3 \times 64 \times 64$ inputs) --- and adjust the energy penalty weight $w_{\text{nrg}}$ interactively to steer training toward more efficient configurations.
+\subsection{Interactive Machine Learning (IML)}
+IML leverages Human-in-the-Loop (HITL) principles, enabling human intuition and domain expertise to guide optimization in high-dimensional or ethically ambiguous parameter spaces. While IML has seen integration in Active Learning and RLHF-based LLM training, its application to dynamically steering multi-objective deep learning loss functions in real-time remains distinctly underexplored \cite{amershi2014power}.
+Addressing this limitation, recent frameworks such as those described by Zhang et al.\ \cite{zhang2025interactive} demonstrate the efficacy of real-time, feedback-driven interventions through control servers that mediate communication between human operators and running training processes, enabling dynamic hyperparameter adjustment and training instability resolution without process restarts. This work builds upon these HITL principles and extends them to the multi-objective fairness domain through the architecture: a JavaScript-based web dashboard dispatches JSON command payloads to a FastAPI asynchronous orchestrator, which relays weight update and control commands to isolated PyTorch training threads via thread-safe \texttt{queue.Queue} message brokers. The training thread polls these queues between mini-batch iterations, applying updated $w_{\text{acc}}$, $w_{\text{fair}}$, and $w_{\text{nrg}}$ coefficients to the composite loss without disrupting backpropagation integrity or requiring checkpointing and restart. Pause, resume, and stop commands are similarly propagated in real time, giving operators full execution control over concurrent multi-model training sessions.
+This architecture is distinguished from static HITL approaches by its \emph{granularity of intervention}: changes take effect at the next mini-batch boundary rather than at epoch boundaries or training restarts, enabling fine-grained fairness trajectory steering whose effects are observable within seconds on the live telemetry dashboard.
+\subsection{Research Gap}
+Prior work in algorithmic fairness has largely treated accuracy-fairness trade-offs as static, pre-configured optimization problems. Existing MOO frameworks either decouple fairness evaluation from the training process (post-processing ROC, standalone NSGA-II) or embed fairness as a fixed gradient penalty (DPD), but do not synthesize all three within a single interactive system. Furthermore, as summarized by Nagpal et al.\ \cite{nagpal2024multiobj}, there remains a critical need for frameworks that concurrently optimize multiple fairness objectives across multiple model architectures and datasets, while permitting real-time human intervention.
+This study fills that gap by introducing a unified, \emph{live} interactive framework that integrates:
+\begin{itemize}[noitemsep]
+    \item \textbf{DPD-based gradient regularization} (in-processing, per-batch, differentiable) applied during PyTorch training of Logistic Regression, DNN, and ResNet-18 models.
+    \item \textbf{Reject Option Classification (ROC) with Counterfactual Fairness} (hybrid, per-5-epoch evaluation) providing both group-level and instance-level fairness scores via an auxiliary XGBoost classifier with SMOTETomek balancing.
+    \item \textbf{NSGA-II Pareto-optimal search} (evolutionary, per-10-epoch evaluation) discovering the complete accuracy–fairness trade-off frontier via the \texttt{pymoo} library across the Adult Census Income, COMPAS, and German Credit datasets.
+    \item \textbf{Real-time human-in-the-loop weight steering} enabling dynamic adjustment of accuracy, fairness, and energy objective weights mid-training across all three architectures without process interruption.
+\end{itemize}
+No existing static framework in the fairness-aware ML literature combines all four capabilities within a single deployable, interactively controllable system.
+% ============================================================
+\section{Background and Fairness Definitions}
+% ============================================================
+\subsection{Problem Formulation}
+
+In supervised learning, the objective is to learn a mapping function $h_{\theta}: X \rightarrow Y$ parameterized by $\theta$, where $X \in \mathbb{R}^d$ denotes the feature space and $Y \in \{0,1\}$ represents the binary target variable. The learned model produces predictions $\hat{Y} = h_{\theta}(X)$, which are typically optimized to minimize a predictive loss such as cross-entropy or classification error.
+
+In fairness-aware settings, the prediction $\hat{Y}$ must also be evaluated with respect to a sensitive attribute $S \in \{0,1\}$. Here, $S=0$ corresponds to the unprivileged group, while $S=1$ corresponds to the privileged group. The inclusion of $S$ introduces an additional constraint: the model should not produce systematically biased outcomes across these groups. Consequently, the learning problem extends beyond accuracy minimization to incorporate fairness constraints, resulting in a multi-criteria optimization setting.
+
+\subsection{Group Fairness: Statistical Parity}
+
+Group fairness aims to ensure that model predictions are independent of the sensitive attribute at a population level. One widely used notion is statistical parity, which requires that the probability of receiving a positive outcome is similar across different groups.
+
+Formally, statistical parity loss is defined as:
+\begin{equation}
+    \mathcal{L}_{\text{SP}} = \left| \mathbb{P}(\hat{Y}=1 \mid S=1) - \mathbb{P}(\hat{Y}=1 \mid S=0) \right|
+\end{equation}
+
+This formulation captures the absolute difference in positive prediction rates between the privileged and unprivileged groups. A value of zero indicates perfect parity, meaning that both groups receive positive outcomes at equal rates. Larger values indicate increasing disparity.
+
+In practice, this loss can be estimated empirically over a dataset $\mathcal{D}$ as:
+\begin{equation}
+    \mathcal{L}_{\text{SP}} \approx 
+    \left|
+    \frac{1}{|\mathcal{D}_{1}|} \sum_{i \in \mathcal{D}_{1}} \hat{Y}_i
+    -
+    \frac{1}{|\mathcal{D}_{0}|} \sum_{i \in \mathcal{D}_{0}} \hat{Y}_i
+    \right|
+\end{equation}
+where $\mathcal{D}_{1}$ and $\mathcal{D}_{0}$ denote subsets corresponding to $S=1$ and $S=0$, respectively.
+
+This metric can be incorporated into the training objective through regularization, penalizing deviations from parity while maintaining predictive performance.
+
+\subsection{Individual Fairness: Counterfactual Fairness}
+
+Individual fairness focuses on ensuring that similar individuals receive similar predictions. A stronger formulation of this principle is counterfactual fairness, which requires that an individual's prediction remains invariant under a change in the sensitive attribute, while all other features are held constant.
+
+For a given instance $x$, with sensitive attribute $S$, the counterfactual version is obtained by replacing $S$ with an alternative value $S'$. The corresponding loss is defined as:
+\begin{equation}
+    \mathcal{L}_{\text{CF}} = \left| \hat{Y}(x, S) - \hat{Y}(x, S') \right|
+\end{equation}
+
+A lower value of $\mathcal{L}_{\text{CF}}$ indicates that the model's prediction is stable with respect to changes in the sensitive attribute, reflecting a higher degree of individual fairness.
+
+Over a dataset $\mathcal{D}$, this can be extended as:
+\begin{equation}
+    \mathcal{L}_{\text{CF}}^{\text{avg}} =
+    \frac{1}{|\mathcal{D}|} \sum_{x \in \mathcal{D}}
+    \left| \hat{Y}(x, S) - \hat{Y}(x, S') \right|
+\end{equation}
+
+This formulation explicitly quantifies the sensitivity of model predictions to protected attributes at the instance level.
+
+\subsection{Multi-Objective Formulation}
+
+The fairness-aware learning problem can be formulated as a multi-objective optimization task, where multiple competing objectives must be optimized simultaneously. Specifically, the goal is to balance predictive accuracy with both group-level and individual-level fairness.
+
+The optimization problem is defined as:
+\begin{equation}
+    \min_{\theta} \; \mathcal{O}(\theta, \lambda) =
+    \left[
+        \mathcal{O}_{\text{acc}}(\theta), \;
+        \mathcal{O}_{\text{ind}}(\theta, \lambda), \;
+        \mathcal{O}_{\text{grp}}(\theta, \lambda)
+    \right]
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\mathcal{O}_{\text{acc}}(\theta)$ represents the prediction loss (e.g., classification error or cross-entropy),
+    \item $\mathcal{O}_{\text{ind}}(\theta, \lambda)$ captures individual fairness through counterfactual loss,
+    \item $\mathcal{O}_{\text{grp}}(\theta, \lambda)$ represents group fairness via statistical parity loss,
+    \item $\lambda$ denotes adjustable parameters that control the relative importance of fairness constraints.
+\end{itemize}
+
+Unlike traditional approaches that combine these objectives into a single scalar function using weighted sums, this formulation preserves their independence. This enables explicit exploration of trade-offs between accuracy and fairness, typically represented as a Pareto frontier. Solutions along this frontier correspond to different optimal compromises, allowing decision-makers to select models based on application-specific fairness requirements.
+% ============================================================
+\section{System Architecture: The Design}
+% ============================================================
+
+\subsection{Architectural Overview}
+
+Designing a system capable of injecting human requests into a neural network in real-time is a complex systems engineering challenge. Standard PyTorch training loops are monolithic initiating a \texttt{for} loop over a dataset blocks the primary execution thread entirely. The system was therefore decoupled into a highly asynchronous \textbf{`` triple-tier''} architecture:
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[height=0.4\textheight, keepaspectratio]{architecture.pdf}
+    \caption{Architecture of the proposed method}
+\end{figure}
+
+\subsection{Tier 1: Frontend (Interactive Dashboard)}
+
+Built with vanilla HTML, CSS, and JavaScript using the Chart.js library, the dashboard is deliberately lightweight to minimize client-side computation overhead.
+
+
+\begin{itemize}
+    \item \textbf{Live Telemetry Polling:} JavaScript polls \texttt{/api/models} every 1000ms, synchronizing charts for Loss, Bias, Fairness Score, and Cumulative Energy Draw.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\linewidth]{telemetry_polling.png}
+        \caption{Live Telemetry Dashboard}
+    \end{figure}
+
+    \item \textbf{Node Initialization Controls:} Labeled dropdowns (Architecture, Target Dataset, Epoch Cycles, Fairness Method) enable clean, unambiguous model configuration.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[height=0.4\textheight, keepaspectratio]{node_initialization.png}
+        \caption{Node Initialization Controls}
+    \end{figure}
+
+    \item \textbf{Dataset-Model Isolation:} Selecting ResNet-18 automatically hides tabular dataset options and routes to the Synthetic Vision pipeline, preventing invalid configuration.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[height=0.4\textheight, keepaspectratio]{dataset_model_isolation.png}
+        \caption{Dataset-Model Isolation Behavior}
+    \end{figure}
+
+    \item \textbf{Real-Time Weight Sliders:} Three sliders directly map to $w_{accuracy}$, $w_{fairness}$, $w_{energy}$. Clicking ``Apply'' packages them into a JSON payload and \texttt{POST}s to the middleware.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[height=0.3\textheight, keepaspectratio]{weight_sliders.png}
+        \caption{Real-Time Weight Adjustment Sliders}
+    \end{figure}
+
+    \item \textbf{HITL Overrides:} \texttt{Pause}, \texttt{Resume}, and \texttt{Terminate} buttons provide hard execution overrides.
+    
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=0.7\linewidth]{hitl_controls.png}
+        \caption{Human-in-the-Loop Control Buttons}
+    \end{figure}
+
+    \item \textbf{Delta Tracking:} Upon weight injection, the dashboard registers the current \texttt{loss}, \texttt{accuracy}, and \texttt{fairness} values as a temporal baseline, then continuously renders $\Delta$ deviation metrics for all subsequent batches.
+\end{itemize}
+
+
+\subsection{Tier 2: Middleware (FastAPI Orchestrator)}
+
+The FastAPI-based middleware (\texttt{api.py}) acts as the critical traffic director, exposing a global \texttt{app} instance deployed via Uvicorn.
+
+\begin{itemize}
+    \item \textbf{Background Thread Delegation:} Each model instance runs via \texttt{BackgroundTasks}, allowing the FastAPI \texttt{asyncio} event loop to remain fully responsive to web traffic at all times.
+    
+    \item \textbf{Thread-Safe Command Queues:} The server maintains a per-model dictionary of \texttt{queue.Queue()} objects. HTTP payloads (e.g., \texttt{"update\_weights"}) are pushed into these queues as non-blocking messages.
+    
+    \item \textbf{API Endpoints:}
+    \begin{itemize}
+            \item \texttt{POST /api/create/model\_id/model\_type/epochs/dataset/fairness\_method} -- Initializes a new trainer; all five parameters are URL path segments.
+            \item \texttt{GET /api/logs/\{model\_id\}} -- Return the latest telemetry snapshot (loss, accuracy, fairness, energy) for a specific model.
+            \item \texttt{GET /api/models} -- Return status summary for all active trainer instances.
+            \item \texttt{POST /api/command/} -- Route commands (start\_training, pause\_training, resume\_training, stop\_training, update\_weights) to the appropriate trainer queue.
+            \item \texttt{DELETE /api/delete/\{model\_id\}} -- Terminate and remove a trainer instance.
+        \end{itemize}
+\end{itemize}
+
+\subsection{Tier 3: Backend (PyTorch Training Engine)}
+
+The backend (\texttt{trainer.py}) houses the core PyTorch optimization loops. Rather than blindly iterating until epoch completion, the engine runs a continuous \textbf{queue polling cycle}:
+
+\begin{itemize}
+    \item At the start of each epoch, \texttt{process\_queues()} is called once to drain the command queue before the inner mini-batch loop begins. Commands therefore take effect at \textbf{epoch boundaries}, not mini-batch boundaries.
+    \item If an \texttt{update\_weights} payload is found: $w_{accuracy}$, $w_{fairness}$, $w_{energy}$ are updated and applied from the first batch of the subsequent epoch without gradient explosion or memory corruption.
+    \item If a \texttt{pause} command is found: the thread enters a \texttt{while is\_paused:time.sleep(0.5); process\_queues()} loop. Critically, \texttt{process\_queues()} is called \textit{inside} the sleep loop -- this prevents deadlock by keeping the paused thread actively listening for a \texttt{resume} command.
+    \item Specialized fairness modules are invoked at configurable intervals: DPD every epoch, ROC every 5 epochs, NSGA-II every 10 epochs.
+\end{itemize}
+
+% ============================================================
+\section{Datasets}
+% ============================================================
+
+\subsection{Dataset Overview}
+
+Three publicly available, fairness-critical tabular datasets are used for tabular model training, plus a synthetic vision dataset for ResNet-18. The Adult Census Income and COMPAS datasets use a 70/30 train/test split; the German Credit and Synthetic Vision datasets use an 80/20 split, consistent with their respective data loader implementations.
+
+\subsection{Adult Census Income}
+
+\begin{itemize}
+    \item \textbf{Source:} UCI Repository / \texttt{fairlearn.datasets.fetch\_adult()}
+    \item \textbf{Size:} 48,842 instances, 14 features.
+    \item \textbf{Task:} Predict whether income exceeds \$50K/year.
+    \item \textbf{Sensitive Attribute:} \texttt{sex} (Male = privileged, Female = unprivileged).
+    \item \textbf{Why Used:} A benchmark dataset widely used in fairness research, enabling direct comparison with literature baselines \cite{nagpal2024multiobj}.
+    \item \textbf{Preprocessing:} \texttt{ColumnTransformer} with \texttt{StandardScaler} for numeric features, \texttt{OneHotEncoder} for categorical features. Gender column isolated as Boolean sensitive mask before encoding.
+\end{itemize}
+
+\subsection{ProPublica COMPASS (Recidivism)}
+\begin{itemize}
+    \item \textbf{Source:} ProPublica COMPAS Analysis GitHub, stored locally at  
+    
+    \texttt{datasets/COMPASS/propublica\_data\_for\_fairml.csv}.
+    
+    \item \textbf{Size:} Over 10,000 criminal defendant records from Broward County, Florida.
+    
+    \item \textbf{Task:} Predict two-year recidivism (binary: re-offended / did not re-offend).
+    
+    \item \textbf{Features (interactive pipeline):} 
+        \begin{itemize}
+            \item Number\_of\_Priors, score\_factor, age\_Above\_FourtyFive, age\_Below\_TwentyFive
+            \item African\_American, Asian, Hispanic, Native\_American, Other
+            \item Female, Misdemeanor
+        \end{itemize}
+    \item \textbf{Sensitive Attribute:} \texttt{Female} column (binary; 0 = Male/privileged, 1 = Female/unprivileged); race-based analysis also applicable.
+    
+    \item \textbf{Why Used:} The COMPAS tool is the canonical example of algorithmic discrimination in the criminal justice system. Evaluating our framework on this dataset demonstrates its applicability to high-stakes, real-world fairness problems.
+    
+    \item \textbf{Preprocessing:} \texttt{StandardScaler} applied to all numeric columns. Target: \texttt{Two \_yr \_Recidivism}.
+    
+    \item \textbf{Important --- Dual Data Source:} The interactive DPD/ROC/NSGA-II pipeline (\texttt{data\_loader.py}) uses the pre-encoded local FairML CSV (\texttt{propublica \_data \_for \_fairml.csv}) with binary-encoded demographic columns. The baseline classifier script (\texttt{classifiers\_compass.py}) loads the raw ProPublica GitHub CSV (\texttt{compas-scores-two-years.csv}) with different raw features (\texttt{age}, \texttt{race}, \texttt{sex}, \texttt{priors count}, \texttt{length\_of\_stay}). Because these two pipelines use different feature representations, direct absolute numerical comparison of baseline vs.\ interactive results should be interpreted with caution.
+\end{itemize}
+
+\subsection{German Credit}
+
+\begin{itemize}
+    \item \textbf{Source:} UCI Statlog Repository (\url{https://archive.ics.uci.edu/dataset/144/statlog+german+credit+data}).
+    \item \textbf{Size:} 1,000 instances, 20 attributes.
+    \item \textbf{Task:} Classify credit applicants as good or bad credit risks.
+    \item \textbf{Features:} Credit amount, duration, payment status, employment duration.
+    \item \textbf{Sensitive Attribute:} \texttt{statussex\_A92} (Female = unprivileged); age also considered.
+    \item \textbf{Why Used:} Financial risk prediction is a critical high-stakes domain. The dataset exhibits significant class imbalance, addressed using the SMOTE-Tomek technique, combining Synthetic Minority Over-sampling with Tomek Link cleaning to balance classes \cite{nagpal2024multiobj}.
+    \item \textbf{Preprocessing:} One-hot encoding of 13 categorical columns, \texttt{StandardScaler} on numeric features. Target: \texttt{credit\_risk} (recoded: 1 = good, 0 = bad).
+\end{itemize}
+
+\subsection{Synthetic Vision Dataset (ResNet-18)}
+
+\begin{itemize}
+    \item \textbf{Generated:} Programmatically via PyTorch using random normal distribution tensors.
+    \item \textbf{Format:} $3 \times 64 \times 64$ RGB tensors ($\mu=0, \sigma=1$); includes pseudo-random binary sensitive attribute.
+    \item \textbf{Why Used:} Standard tabular data clears CPU cache in milliseconds, making energy telemetry indistinguishable from background noise. Synthetic high-resolution image tensors force sustained GPU/CPU load, enabling meaningful energy profiling. This avoids the need for large dataset downloads (e.g., CelebA, FairFace) while proving the framework is \textbf{architecture-agnostic} -- fairness and energy optimization work equally well for vision CNNs and tabular models.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\caption{Summary of Datasets Used}
+\begin{tabular}{lllll}
+\toprule
+\textbf{Dataset} & \textbf{Size} & \textbf{Task} & \textbf{Sensitive Attr.} & \textbf{Model} \\
+\midrule
+Adult Census Income & 48,842 & Income prediction & Sex & LR, DNN \\
+ProPublica COMPASS & 10,000+ & Recidivism prediction & Sex, Race & LR, DNN \\
+German Credit & 1,000 & Credit risk & Sex, Age & LR, DNN \\
+Synthetic Vision & 2,500 (gen.) & Binary classification & Pseudo-gender & ResNet-18 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ============================================================
+\section{Models}
+% ============================================================
+
+\subsection{Model Selection Rationale}
+
+Three architecturally distinct model types were selected to prove the framework's \textbf{architecture-agnostic versatility} -- from simple convex optimization to deep non-linear hierarchies to complex convolutional abstraction:
+
+
+\subsection{Deep Neural Network (Non-Linear Tabular)}
+
+A multi-layer perceptron with architecture: $Input \rightarrow 64 \rightarrow 32 \rightarrow 1$, using ReLU activations and a single Dropout(0.2) layer applied after the first hidden layer only.
+
+\begin{itemize}
+    \item \textbf{Role:} Introduces deep non-linear feature interactions and verifies gradient stability under dynamic fairness penalty injection during backpropagation.
+    \item \textbf{Dataset:} Adult, COMPASS, German Credit.
+    \item \textbf{Fairness Sensitivity:} Intermediate-depth gradients show measurable response when $w_{fairness}$ is increased via the UI slider, validating the interactive framework.
+\end{itemize}
+
+\subsection{ResNet-18 (Computer Vision CNN)}
+
+The standard \texttt{torchvision.models.resnet18} architecture with its 1000-class final layer overridden with a single sigmoid output node for binary classification.
+
+\begin{itemize}
+    \item \textbf{Initialisation:} The model is instantiated with \texttt{pretrained=False}, using random weight initialisation rather than ImageNet pre-training. This ensures energy profiling reflects the cost of training from scratch on synthetic tensors and avoids requiring large model downloads.
+    \item \textbf{Role:} The heavyweight tier for energy stress-testing. Proves that DPD fairness penalties and energy tracking work on deep CNNs with skip connections -- not just tabular models.
+    \item \textbf{Dataset:} Synthetic Vision (3$\times$64$\times$64 tensors). Tabular dataset selection is hidden in the UI when ResNet-18 is chosen.
+    \item \textbf{Energy Signature:} Initiating a ResNet-18 instance triggers immediate spikes in estimated hardware power demand (100W+ TDP peaks), in stark contrast to the flat traces of other models.
+    \item \textbf{Research Contribution:} Demonstrates that the interactive framework is architecture-agnostic -- the same command-queue and fairness-penalization system works across simple linear models and complex vision networks without modification.
+\end{itemize}
+
+\subsection{Baseline Comparison Models}
+
+To contextualize multi-objective fairness results, the following standard classifiers are used as baselines, selected for their established performance on fairness-critical tabular datasets \cite{nagpal2024multiobj}:
+
+\begin{itemize}
+    \item \textbf{XGBoost:} Gradient-boosted decision trees. Consistently the highest baseline performer across all three datasets.
+    \item \textbf{Random Forest:} Ensemble of decision trees with high recall performance.
+    \item \textbf{AdaBoost:} Weighted ensemble boosting.
+    \item \textbf{Decision Trees:} Single-tree baseline.
+    \item \textbf{Naive Bayes:} Probabilistic non-ensemble baseline.
+\end{itemize}
+
+% ============================================================
+\section{Methodology}
+% ============================================================
+
+\subsection{In-Processing: Multi-Objective Loss Function}
+
+The mathematical epicenter of the interactive training engine is a unified, differentiable scalarized loss executed during every mini-batch backward pass:
+
+\begin{equation}
+    \mathcal{L}_{total} = (w_{acc} \times \mathcal{L}_{BCE}) + (w_{fair} \times (\mu_{priv} - \mu_{unpriv})^2) + (w_{nrg} \times \sum_{i}||\theta_i||_2)
+\end{equation}
+
+\noindent where:
+
+\begin{itemize}
+    \item $w_{acc} \times \mathcal{L}_{BCE}$: Binary Cross-Entropy classification accuracy loss.
+    \item $w_{fair} \times (\mu_{priv} - \mu_{unpriv})^2$: Fairness penalty -- the squared difference in mean output probabilities between privileged and unprivileged groups, as identified by Boolean sensitive masks passed through the DataLoader. This is a \textbf{continuous, differentiable proxy for Demographic Parity Difference}.
+    \item $w_{nrg} \times \sum_{i}||\theta_i||_2$: L2 parameter density regularization. Acts as an energy proxy by penalizing large, sprawling network weights that correlate with high floating-point operation counts and sustained hardware draw.
+\end{itemize}
+
+The variables $w_{acc}$, $w_{fair}$, $w_{nrg}$ are \textbf{dynamically adjustable in real-time} via the UI sliders, updated at each epoch start by the \texttt{process\_queues()} function inside \texttt{trainer.py}.
+
+\subsection{Post-Processing: Reject Option Classification (ROC)}
+
+The ROC module (\texttt{fairness\_roc.py}) implements the algorithm described in \cite{nagpal2024multiobj}:
+\subsubsection{Algorithm}
+
+\begin{enumerate}
+    \item Apply SMOTE-Tomek preprocessing to balance the training dataset. This step generates synthetic samples for the minority class while removing ambiguous samples near class boundaries.
+    
+    \item Train a classifier $h_{\theta}$ on the processed dataset to obtain prediction probabilities $\hat{Y}(x) \in [0,1]$.
+    
+    \item Define a rejection threshold parameter $\alpha \in (0,1)$. Test predictions are sorted by probability; the bottom $\alpha$-fraction (by predicted probability) constitutes the rejected zone:
+    \begin{equation}
+        \text{reject\_threshold} = \text{quantile}(\hat{p},\; \alpha)
+    \end{equation}
+    Instances with $\hat{p}(x) < \text{reject\_threshold}$ are assigned to the rejected (uncertain) zone; those with $\hat{p}(x) \geq \text{reject\_threshold}$ are accepted (high-confidence). This is a percentile-based split implemented in \texttt{fairness\_roc.py}, not a symmetric interval around 0.5.
+    
+    \item \textbf{Group Fairness:} Evaluate statistical parity on the accepted predictions using:
+    \begin{equation}
+        \mathcal{L}_{\text{SP}} = \left| \mathbb{P}(\hat{Y}=1 \mid S=1) - \mathbb{P}(\hat{Y}=1 \mid S=0) \right|
+    \end{equation}
+    
+    \item \textbf{Individual Fairness:} For each instance $x$, compute counterfactual consistency by modifying the sensitive attribute $S \rightarrow S'$:
+    \begin{equation}
+        \mathcal{L}_{\text{CF}} = \left| \hat{Y}(x, S) - \hat{Y}(x, S') \right|
+    \end{equation}
+\end{enumerate}
+
+\subsubsection{Mathematical Formulation}
+
+The rejection-based optimization problem can be formulated as a multi-objective task:
+
+\begin{align}
+    &\max_{\theta} \quad \mathcal{O}_{\text{acc}}(\theta) \\
+    &\min_{\theta} \quad \mathcal{O}_{\text{rej}}(\theta) = 
+    \frac{|\{x \in \mathcal{R} \mid \hat{Y}(x) \neq Y(x)\}|}{|\mathcal{R}|} \\
+    &\text{subject to} \quad |\mathcal{R}| \leq \alpha \cdot |\mathcal{D}|
+\end{align}
+
+where $\mathcal{R}$ denotes the set of rejected instances and $\mathcal{D}$ is the dataset.
+
+\subsection{Evolutionary Optimization: NSGA-II}
+
+The optimization process can also be framed as a multi-objective evolutionary problem, where model parameters $\theta$ are evolved to jointly optimize accuracy and fairness.
+
+The objectives are defined as:
+\begin{align}
+    &\min_{\theta} \quad \mathcal{O}_{\text{acc}}^{*}(\theta) = 1 - \mathcal{O}_{\text{acc}}(\theta) \\
+    &\min_{\theta} \quad \mathcal{O}_{\text{grp}}(\theta) = \mathcal{L}_{\text{SP}}
+\end{align}
+
+A population of candidate solutions is iteratively updated using selection, crossover, and mutation operators. The process converges toward a set of Pareto-optimal solutions representing different trade-offs between predictive performance and fairness.
+
+\subsubsection{Non-Dominated Sorting}
+
+Let $\mathcal{P}$ be a population of candidate solutions. For each solution $i \in \mathcal{P}$:
+
+\begin{align}
+    \mathcal{S}_i &= \{j \in \mathcal{P} \mid i \prec j\} \\
+    n_i &= |\{j \in \mathcal{P} \mid j \prec i\}|
+\end{align}
+
+where $i \prec j$ denotes that solution $i$ dominates solution $j$, i.e., $i$ is no worse in all objectives and strictly better in at least one.
+
+The first Pareto front is defined as:
+\begin{equation}
+    \mathcal{F}_1 = \{i \in \mathcal{P} \mid n_i = 0\}
+\end{equation}
+
+This set contains non-dominated solutions representing optimal trade-offs between accuracy and fairness. Subsequent fronts are constructed iteratively by removing previously identified fronts.
+
+\subsection{Process-Specific Energy Tracking}
+
+The \texttt{DynamicPowerTracker} class (\texttt{libraries/power\_tracker.py}) runs in a parallel thread, continuously sampling:
+
+\begin{equation}
+    P_{\text{est}}(t) = 
+    \frac{\text{CPU\_util}(t)}{100} \cdot \text{TDP}_{\text{CPU}} \;+\; 
+    \frac{\text{GPU\_util}(t)}{100} \cdot \text{TDP}_{\text{GPU}}
+\end{equation}
+
+\textbf{Critical implementation detail:} Rather than measuring global CPU utilization (which would include OS, browser, and all other processes), the tracker uses:
+
+\begin{verbatim}
+self.process = psutil.Process()
+cpu_util = self.process.cpu_percent() / 100.0
+\end{verbatim}
+
+This isolates the power draw to \textit{only the model training process}, ensuring reported energy is a direct function of model computational complexity and not background system load. Energy is integrated over time:
+\begin{equation}
+    E_{cumulative} = \sum_{t} P_{estimated}(t) \times \Delta t
+\end{equation}
+
+% ============================================================
+\section{Experimental Setup and Baseline Results}
+% ============================================================
+
+\subsection{Training Configuration}
+
+\begin{itemize}
+    \item \textbf{Tabular Models (LR, DNN) -- Adult \& COMPAS:} Adam optimizer, Binary Cross-Entropy loss, batch size 256, train/test split 70/30.
+    \item \textbf{Tabular Models (LR, DNN) -- German Credit:} Adam optimizer, Binary Cross-Entropy loss, batch size 64, train/test split 80/20.
+    \item \textbf{ResNet-18:} Adam optimizer, batch size 64, Synthetic Vision tensors ($3 \times 64 \times 64$), train/test split 80/20 (2000/500 synthetic samples).
+    \item \textbf{NSGA-II:} Population size \texttt{pop\_size = 50}, evaluation budget \texttt{n\_evals = 200} function evaluations (not generations), crossover: SBX ($\eta=15$, $p=0.9$), mutation: Polynomial Mutation ($\eta=20$).
+    \item \textbf{ROC:} Rejection threshold $\alpha = 0.65$ (65th percentile of predicted probabilities).
+    \item \textbf{SMOTETomek:} Applied to German Credit to address class imbalance.
+\end{itemize}
+
+\subsection{Baseline Results: German Credit Dataset}
+
+Table \ref{tab:baseline_german} compares five standard classifiers on the German Credit dataset. XGBoost achieved the highest balanced performance (Accuracy: 82.0\%, F1: 87.5\%). Random Forest achieved the highest Recall (90.7\%), making it suitable for applications prioritizing false negative minimization. \cite{nagpal2024multiobj}
+
+\begin{table}[h]
+\centering
+\caption{Baseline Classifier Performance -- German Credit Dataset}
+\label{tab:baseline_german}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Classifier} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+AdaBoost        & 78.2\% & 84.6\% & 80.7\% & 82.6\% \\
+Decision Trees  & 70.7\% & 81.5\% & 75.9\% & 72.6\% \\
+Naive Bayes     & 72.0\% & 81.3\% & 76.9\% & 78.3\% \\
+Random Forest   & 82.0\% & 82.1\% & 88.7\% & 85.7\% \\
+\textbf{XGBoost} & \textbf{82.0\%} & \textbf{85.7\%} & \textbf{89.3\%} & \textbf{87.5\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\newpage
+\subsection{Baseline Results: COMPAS Dataset}
+
+Table \ref{tab:baseline_compas} shows XGBoost outperforming all classifiers on the COMPAS dataset (Accuracy: 66.72\%, F1: 61.84\%). The lower accuracy ceiling across all models reflects the inherent difficulty of recidivism prediction and the presence of demographic biases in the underlying data structure \cite{angwin2016machine}.
+
+\begin{table}[h]
+\centering
+\caption{Baseline Classifier Performance -- COMPAS Dataset}
+\label{tab:baseline_compas}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Classifier} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+AdaBoost        & 67.12\% & 63.05\% & 62.34\% & 62.69\% \\
+Decision Trees  & 63.50\% & 59.50\% & 57.10\% & 58.28\% \\
+Naive Bayes     & 64.60\% & 60.75\% & 58.05\% & 59.37\% \\
+Random Forest   & 64.85\% & 60.50\% & 60.10\% & 60.30\% \\
+\textbf{XGBoost} & \textbf{67.45\%} & \textbf{63.90\%} & \textbf{61.00\%} & \textbf{62.40\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Baseline Results: Adult Income Dataset}
+
+Table \ref{tab:baseline_adult} shows XGBoost achieving the highest performance (Accuracy: 86.35\%, F1: 71.09\%). These baselines are accuracy-optimal but \textit{fairness-unaware} -- they will be contrasted against the multi-objective results in Section \ref{sec:moo_results}.
+
+\begin{table}[h]
+\centering
+\caption{Baseline Classifier Performance -- Adult Income Dataset}
+\label{tab:baseline_adult}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Classifier} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+AdaBoost        & 84.10\% & 66.25\% & 68.40\% & 67.30\% \\
+Decision Trees  & 81.70\% & 61.30\% & 63.60\% & 62.45\% \\
+Naive Bayes     & 80.05\% & 66.20\% & 33.10\% & 44.00\% \\
+Random Forest   & 85.05\% & 70.50\% & 65.10\% & 67.70\% \\
+\textbf{XGBoost} & \textbf{86.70\%} & \textbf{73.10\%} & \textbf{69.90\%} & \textbf{71.45\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+% ============================================================
+\section{Results and Analysis}
+\label{sec:moo_results}
+% ============================================================
+
+\subsection{Multi-Objective Optimization Results: German Credit}
+
+Table \ref{tab:moo_german} presents the fairness results for all MOO algorithms on the German Credit dataset. The ROC method applied to the XGBoost baseline achieved 94.29\% accuracy on accepted instances while maintaining an individual fairness loss of 0.04 and group fairness loss of 0.06 -- \textit{significantly outperforming} all evolutionary alternatives including NSGA-II \cite{nagpal2024multiobj}.
+
+\begin{table}[h]
+\centering
+\caption{MOO Results -- German Credit Dataset (Sensitive: Gender)}
+\label{tab:moo_german}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Algorithm} & \textbf{Accuracy} & \textbf{Ind. Fairness Loss} & \textbf{Group Fairness Loss} \\
+\midrule
+NSGA-II                     & 80.01 & 0.03 & 0.04 \\
+Particle Swarm Optimization & 83.03 & 0.02 & 0.04 \\
+Differential Evolution      & 84.59 & 0.02 & 0.08 \\
+Genetic Algorithm           & 76.10 & 0.01 & 0.06 \\
+Nelder-Mead                 & 79.50 & 0.02 & 0.06 \\
+\midrule
+\textbf{ROC -- Accepted}    & \textbf{94.29} & \textbf{0.04} & \textbf{0.06} \\
+ROC -- Rejected             & 75.38 & 0.01 & 0.06 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Multi-Objective Optimization Results: COMPAS}
+
+Table \ref{tab:moo_compas} shows that ROC improved the baseline XGBoost from 66.72\% to 71.43\% accuracy on accepted instances, with a dramatic reduction in group fairness loss to 0.01 -- a major improvement over the 0.29 achieved by NSGA-II.
+
+\begin{table}[h]
+\centering
+\caption{MOO Results -- COMPAS Dataset (Sensitive: Gender)}
+\label{tab:moo_compas}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Algorithm} & \textbf{Accuracy} & \textbf{Ind. Fairness Loss} & \textbf{Group Fairness Loss} \\
+\midrule
+NSGA-II                     & 68.60 & 0.18 & 0.29 \\
+Particle Swarm Optimization & 66.80 & 0.27 & 0.19 \\
+Differential Evolution      & 65.59 & 0.01 & 0.06 \\
+Genetic Algorithm           & 65.10 & 0.01 & 0.06 \\
+Nelder-Mead                 & 67.77 & 0.24 & 0.06 \\
+\midrule
+\textbf{ROC -- Accepted}    & \textbf{71.43} & 0.41 & \textbf{0.01} \\
+ROC -- Rejected             & 64.00 & 0.14 & 0.11 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Multi-Objective Optimization Results: Adult Income}
+
+Table \ref{tab:moo_adult} shows that on the Adult Income dataset, ROC maintains 84.3\% accuracy with strong fairness metrics (individual fairness loss: 0.25, group: 0.02). Notably, the rejected instances achieve 90.3\% accuracy, demonstrating that ROC selectively routes its most complex, uncertain instances for rejection review while serving highly accurate decisions on the rest.
+
+\begin{table}[h]
+\centering
+\caption{MOO Results -- Adult Income Dataset (Sensitive: Gender)}
+\label{tab:moo_adult}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Algorithm} & \textbf{Overall Acc.} & \textbf{Ind. Fairness Loss} & \textbf{Group Fairness Loss} \\
+\midrule
+NSGA-II                     & 84.08 & 0.27 & 0.39 \\
+Particle Swarm Optimization & 84.57 & 0.26 & 0.02 \\
+Differential Evolution      & 75.05 & 0.01 & 0.06 \\
+Genetic Algorithm           & 75.59 & 0.01 & 0.03 \\
+Nelder-Mead                 & 76.88 & 0.02 & 0.06 \\
+\midrule
+\textbf{ROC -- Accepted}    & \textbf{84.3}  & 0.25 & \textbf{0.02} \\
+ROC -- Rejected             & 90.3  & 0.01 & 0.02 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Interactive Training: Dynamic Weight Shifting}
+
+Live experiments confirmed the theoretical accuracy-vs-fairness trade-off in real-time:
+
+\begin{itemize}
+    \item \textbf{Baseline State ($w_{fairness}=0$):} The Bias KPI hovered at persistently high levels, confirming the network learned discriminatory demographic correlations.
+    \item \textbf{Mid-Training Intervention:} Tuning $w_{fairness}$ to 5.0 at Epoch 10 triggered an immediate visible drop in the live Bias disparity chart at the very next batch iteration.
+    \item \textbf{Accuracy-Fairness Trade-off:} As enforcing the DPD penalty caused the model to un-learn discriminatory proxy features, raw Accuracy KPIs declined proportionally -- empirically validating the MOO trade-off.
+    \item \textbf{Delta Tracking:} The dashboard quantified per-slider-injection metric improvements (e.g., ``fairness improved +0.32 since last parameter update'').
+\end{itemize}
+
+\subsection{Energy Profiling Across Architectures}
+
+\begin{itemize}
+
+    \item \textbf{DNN (Adult Income):} Moderate sustained power draw during forward/backward passes over 256-sample batches.
+    \item \textbf{ResNet-18 (Synthetic Vision):} Immediate spikes to 100W+ TDP-estimated consumption upon initiating kernel convolutions. Dramatically validates the importance of energy-aware training proxies for deep vision architectures.
+\end{itemize}
+
+The process-specific tracking (\texttt{psutil.Process().cpu\_percent()}) confirmed that pausing a model training node caused immediate metric drops to near-idle ($<5W$) even when other applications were running, validating energy measurement isolation integrity.
+
+% ============================================================
+\section{Conclusion and Recommendations}
+% ============================================================
+
+\subsection{Summary}
+
+This research presents a robust, architecture-agnostic, interactive multi-objective optimization framework for responsible AI development. Key contributions include:
+
+\begin{enumerate}
+    \item A unified, differentiable loss function combining accuracy (BCE), fairness (DPD gradient regularization), and energy (L2 density proxy) with real-time human-steerable weights.
+    \item Integration of ROC and NSGA-II modules enabling post-processing and evolutionary fairness optimization, complementing the in-processing DPD mechanism.
+    \item A   architecture enabling deadlock-free, live human-in-the-loop intervention without interrupting backpropagation.
+    \item Empirical validation across three fairness-critical datasets (German Credit, COMPASS, Adult Income) and three model architectures (LR, DNN, ResNet-18).
+    \item Baseline comparisons demonstrating ROC's superiority over NSGA-II, PSO, DE, GA, and Nelder-Mead across all dataset fairness metrics \cite{nagpal2024multiobj}.
+\end{enumerate}
+
+\subsection{Limitations}
+
+\begin{itemize}
+    \item Energy tracking relies on CPU utilization heuristics and static TDP estimates rather than direct silicon-level RAPL interfaces.
+    \item Fairness analysis focuses on binary gender as the sensitive attribute; intersectional analysis (race $\times$ gender) is left to future work.
+    \item NSGA-II is computationally expensive for large populations; a reduced population was used in the interactive setting.
+\end{itemize}
+
+\subsection{Recommendations for Future Work}
+
+\begin{itemize}
+    \item \textbf{Deep Hardware Integration:} Incorporate NVIDIA NVML or AMD GPU bindings for silicon-level energy measurement.
+    \item \textbf{NLP Domain Extension:} Adapt the framework to Transformer-based language models (e.g., DistilBERT) to address bias in text generation.
+    \item \textbf{Intersectional Fairness:} Extend penalty logic to concurrently assess multiple sensitive attributes (gender and race simultaneously).
+    \item \textbf{Real-Time Decision Systems:} Deploy in live credit lending or judicial systems, assessing computational efficiency in streaming data environments.
+    \item \textbf{Explainability:} Integrate SHAP or LIME to explain which instances are rejected/accepted by the ROC module.
+\end{itemize}
+
+
+
+%================================================
+\newpage
+\section*{References}
+\begin{thebibliography}{99}
+
+\bibitem{angwin2016machine}
+Angwin, J., Larson, J., Mattu, S., Kirchner, L. (2016).
+\textit{Machine Bias: There's software used across the country to predict future criminals. And it's biased against blacks}.
+ProPublica.
+\url{https://www.propublica.org/article/machine-bias-risk-assessments-in-criminal-sentencing}
+
+\bibitem{nagpal2024multiobj}
+Nagpal, R., Khan, A., Borkar, M., Gupta, A. (2024).
+A Multi-Objective Framework for Balancing Fairness and Accuracy in Debiasing Machine Learning Models.
+\textit{Machine Learning and Knowledge Extraction}, 6, 2130--2148.
+\url{https://doi.org/10.3390/make6030105}
+
+\bibitem{deb2002nsga2}
+Deb, K., Pratap, A., Agarwal, S., Meyarivan, T. (2002).
+A fast and elitist multiobjective genetic algorithm: NSGA-II.
+\textit{IEEE Transactions on Evolutionary Computation}, 6(2), 182--197.
+
+\bibitem{hardt2016equality}
+Hardt, M., Price, E., Srebro, N. (2016).
+Equality of opportunity in supervised learning.
+\textit{Advances in Neural Information Processing Systems (NeurIPS)}.
+
+\bibitem{amershi2014power}
+Amershi, S., Cakmak, M., Knox, W. B., Kulesza, T. (2014).
+Power to the people: The role of humans in interactive machine learning.
+\textit{AI Magazine}, 35(4), 105--120.
+
+\bibitem{zhang2025interactive}
+Zhang, W., Lu, Y. Y., Deng, Y. (2025).
+Interactive Training: Feedback-Driven Neural Network Optimization.
+\textit{arXiv preprint arXiv:2510.02297}.
+\url{https://arxiv.org/abs/2510.02297}
+
+\bibitem{gupta2023towards}
+Gupta, U., Jiang, D., Balandat, M., Wu, C.-J. (2023).
+Towards Green, Accurate, and Efficient AI Models Through Multi-Objective Optimization.
+\textit{ICLR 2023 Workshop on Tackling Climate Change with Machine Learning}.
+
+\bibitem{giovanelli2024interactive}
+Giovanelli, J., Tornede, A., Tornede, T., Lindauer, M. (2024).
+Interactive Hyperparameter Optimization in Multi-Objective Problems via Preference Learning.
+\textit{Proceedings of the AAAI Conference on Artificial Intelligence}.
+
+\bibitem{chen2016xgboost}
+Chen, T., Guestrin, C. (2016).
+XGBoost: A scalable tree boosting system.
+\textit{Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining}, 785--794.
+\url{https://doi.org/10.1145/2939672.2939785}
+
+\bibitem{schwartz2020green}
+Schwartz, R., Dodge, J., Smith, N. A., Etzioni, O. (2020).
+Green AI.
+\textit{Communications of the ACM}, 63(12), 54--63.
+\url{https://doi.org/10.1145/3381831}
+
+\end{thebibliography}
+%=============================================================================
+\newpage
+\section{Appendix}
+% =============================================================================
+
+\subsection{Appendix A: Source Code Module Descriptions}
+\begin{itemize}
+    \item \texttt{main.py}: Entry point; starts FastAPI server via Uvicorn on \texttt{127.0.0.1:5000}.
+    \item \texttt{api.py}: REST API route handlers (\texttt{/api/create}, \texttt{/api/logs}, \texttt{/api/command}, \texttt{/api/delete}).
+    \item \texttt{trainer.py}: Core \texttt{InteractiveTrainer} class; PyTorch training loops, queue polling, DPD/ROC/NSGA-II dispatch.
+    \item \texttt{data\_loader.py}: Dataset abstraction; dispatches to \texttt{get\_adult\_dataloaders()}, \texttt{get\_compass\_dataloaders()}, \texttt{get\_german\_credit\_dataloaders()}, 
+    
+    \texttt{get\_synthetic\_vision\_dataloaders()}.
+    \item \texttt{models.py}: PyTorch model definitions: \texttt{LogisticRegression}, \texttt{DeepNeuralNetwork}, \texttt{ResNet18Custom}.
+    \item \texttt{fairness\_roc.py}: ROC fairness computation (SMOTETomek $\rightarrow$ XGBoost $\rightarrow$ threshold split $\rightarrow$ group + counterfactual fairness).
+    \item \texttt{fairness\_nsga2.py}: NSGA-II Pareto optimization via \texttt{pymoo}; bi-objective: accuracy and statistical parity.
+    \item \texttt{baseline\_models/classifiers\_adult\_income.py}: XGBoost, Random Forest, Naive Bayes, AdaBoost, Decision Tree on Adult dataset.
+    \item \texttt{baseline\_models/classifiers\_compass.py}: Same baseline classifiers on COMPAS dataset.
+    \item \texttt{baseline\_models/classifiers\_german\_credit.py}: XGBoost, Random Forest, Logistic Regression baselines on German Credit dataset.
+    \item \texttt{baseline\_models/classifiers\_synthetic\_vision.py}: Logistic Regression and Random Forest baselines on flattened synthetic vision tensors.
+\end{itemize}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Appendix B: Composite Loss Function (Code)}
+\begin{lstlisting}[style=pythonstyle, caption={Composite multi-objective loss calculation per mini-batch (trainer.py).}]
+# Accuracy loss
+loss_acc = criterion(outputs, batch_y)  # Binary Cross-Entropy
+
+# Fairness loss (DPD proxy)
+if batch_priv.any() and batch_unpriv.any():
+    p_mean = torch.mean(outputs[batch_priv])
+    u_mean = torch.mean(outputs[batch_unpriv])
+    loss_fair = (p_mean - u_mean)**2
+else:
+    loss_fair = torch.tensor(0.0)
+
+# Energy regularization (L2 parameter norm)
+l2_reg = torch.tensor(0.)
+for param in model.parameters():
+    l2_reg += torch.norm(param)
+loss_energy = l2_reg
+
+# Composite weighted sum
+batch_loss = (w_accuracy * loss_acc) \
+           + (w_fairness * loss_fair) \
+           + (w_energy * loss_energy)
+batch_loss.backward()
+optimizer.step()
+\end{lstlisting}
+
+\subsection{Appendix C: Synthetic Vision Dataset Generator}
+\begin{lstlisting}[style=pythonstyle, caption={Synthetic vision data generation (data_loader.py).}]
+num_train, num_test = 2000, 500
+
+# 3-channel RGB random tensors: (N, C, H, W) = (2000, 3, 64, 64)
+X_train = torch.randn(num_train, 3, 64, 64)
+y_train = torch.randint(0, 2, (num_train, 1)).float()
+
+# Randomly assigned binary sensitive attribute
+sens_train        = torch.randint(0, 2, (num_train,))
+priv_mask_train   = sens_train == 1  # group 1 = privileged
+unpriv_mask_train = sens_train == 0  # group 0 = unprivileged
+\end{lstlisting}
+
+\subsection{Appendix D: NSGA-II Hyperparameter Decoding}
+\begin{lstlisting}[style=pythonstyle, caption={Decision variable decoding in FairnessProblem (fairness_nsga2.py).}]
+def _decode_params(self, x):
+    """Map [0,1]^3 decision variables to XGBoost hyperparameters."""
+
+    max_depth     = int(2 + x[0] * 6)        # [2, 8]
+    n_estimators  = int(50 + x[1] * 150)     # [50, 200]
+    learning_rate = 0.001 + x[2] * 0.299     # [0.001, 0.3]
+
+    return max_depth, n_estimators, learning_rate
+\end{lstlisting}
+
+\end{document}

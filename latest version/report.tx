@@ -1,0 +1,283 @@
+\documentclass[12pt,a4paper]{article}
+
+% --- Essential Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{setspace}
+\usepackage{microtype} % Improves typography and spacing
+\usepackage{enumitem}  % Better control over lists
+\usepackage{listings}  % For code snippets in Appendix
+
+% --- Page Layout ---
+\geometry{a4paper, margin=1in}
+\onehalfspacing % Standard academic spacing
+\setlength{\parskip}{6pt}
+
+% --- Hyperref Setup ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=blue,
+    pdftitle={Interactive Multi-Objective Optimization for AI Models},
+}
+
+% --- Code Snippet Styling ---
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color[gray]{0.95},
+    language=Python
+}
+
+% --- Title Information ---
+\title{\textbf{Interactive Multi-Objective Optimization for Balancing Accuracy, Fairness, and Energy Efficiency in AI Models}}
+\author{Sajid Ahmed Siddiqui}
+\date{April 1st, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Machine learning systems are increasingly deployed in high-stakes domains, raising critical concerns regarding fairness, bias, and sustainability. Models optimized solely for predictive accuracy often exhibit discriminatory behavior toward protected groups and incur significant computational and energy costs. Recent research highlights the need for multi-objective optimization (MOO) frameworks that explicitly balance competing objectives such as accuracy, fairness, and energy consumption.
+
+This study proposes an interactive, in-processing multi-objective optimization techniques that integrates Interactive Training with the Non-dominated Sorting Genetic Algorithm II (NSGA-II). The framework jointly optimizes predictive accuracy, group fairness loss, individual fairness loss, and energy consumption. Fairness and bias are evaluated using the Adult Census Income and COMPAS datasets, while energy consumption is analyzed using the LCBench benchmark from the OpenML CC-18 suite. Interactive Training enables real-time human or agent intervention during optimization, allowing dynamic exploration of ethical and computational trade-offs. The proposed approach aims to improve transparency, adaptability, and sustainability in fairness-aware machine learning systems.
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Overview and Context (The rise of Automated Decision Systems)}
+The past decade has witnessed an unprecedented acceleration in the deployment of Automated Decision Systems (ADS) powered by modern Artificial Intelligence (AI) and Machine Learning (ML). These systems are no longer relegated to research laboratories; they govern the infrastructural backbone of human society. From algorithms determining creditworthiness and mortgage approvals in monolithic financial institutions to recidivism risk-assessment tools deployed in the criminal justice system, and predictive analytics parsing oncology scans in hospital wards, ML algorithms are increasingly the ultimate arbiters of critical societal outcomes. 
+
+Historically, the dominant driving force behind this rapid integration—and the academic funding supporting it—has been a singular, uncompromising metric: predictive accuracy. For decades, ML architectures have been mathematically formulated to minimize a single loss function corresponding strictly to error rates. Whether calculating the Mean Squared Error (MSE) of a housing price prediction or the Cross-Entropy Loss of a natural language translation, engineers have operated under the pervasive, albeit reductionist, assumption that a highly accurate model is intrinsically the most optimal solution for any given societal problem.
+
+\subsection{The Paradox of Modern ML: Performance vs. Ethics vs. Sustainability}
+However, this relentless, myopic pursuit of statistical perfection has exposed a devastating triad paradox within modern ML paradigms. Achieving state-of-the-art predictive accuracy frequently entails severe, yet often unquantified, detriments to other foundational societal priorities. Chief among these conflicting pillars are ethical algorithmic fairness and physical environmental sustainability.
+
+Firstly, highly accurate models frequently internalize, amplify, and perpetuate systemic societal biases present in historical training data. A model optimized purely for accuracy on a skewed dataset will logically learn to discriminate, resulting in outcomes that disproportionately marginalize unprotected demographic groups. For example, if historical hiring data favors male candidates due to historical societal prejudices, an accuracy-driven resume-screening AI will mathematically deduce that ``being male'' is a highly predictive feature of ``being hired,'' thereby encoding historical sexism into a future automated barrier. 
+
+Secondly, the relentless scaling of modern model architectures demands astronomical computational resources. Deep Convolutional Neural Networks (CNNs) analyzing high-resolution video streams and Large Language Model (LLM) Transformers containing hundreds of billions of parameters require vast clusters of specialized Graphic Processing Units (GPUs) running continuously for weeks or months. The electricity consumption required to train these models has severe environmental implications, directly contradicting global sustainability goals and expanding the technology sector's carbon footprint at an alarming and accelerating rate. Thus, deploying ML models presents a strict paradox: maximizing raw predictive performance often inherently damages ethical parity and physical sustainability.
+
+\subsection{Problem Statement: The Rigidity of Static Training Loops}
+Implementing real-world AI applications effectively requires navigating the unavoidable trade-offs between these fiercely competing priorities. Multi-Objective Optimization (MOO) provides robust mathematical structures for concurrently addressing multiple, conflicting goals (e.g., maximizing accuracy while simultaneously minimizing energy draw and demographic disparity). However, the vast majority of contemporary MOO techniques applied in Deep Learning rely on archaic, static weighting paradigms. 
+
+In a standard MOO workflow:
+\begin{itemize}[noitemsep]
+    \item \textbf{Pre-defined Constraints:} Developers assign constant scalar weights (e.g., $w_{accuracy} = 0.8$, $w_{fairness} = 0.2$) prior to initiating the training sequence.
+    \item \textbf{Inflexibility:} Once the backpropagation loops commence across massive datasets, these parameters are mathematically locked into the compiled computational graph.
+    \item \textbf{Iterative Stagnation:} If an ongoing, multi-day training process begins to exhibit egregious bias against a minority class or sustains an unexpectedly massive GPU power spike, the system cannot adapt dynamically to correct course.
+\end{itemize}
+
+There is a fundamental void in the literature regarding mechanisms that allow human experts—or autonomous ethical oversight agents—to intervene dynamically and shift these multi-objective priorities seamlessly in real-time as the model's behavioral trajectory evolves out of the latent space. Bridging this gap from static optimization to interactive, steerable training is crucially required for developing AI systems that are responsive, responsible, and capable of adhering to tightening international regulatory frameworks (such as the EU AI Act).
+
+\subsection{Research Questions}
+To address these rigidities, this study poses the following critical research questions:
+\begin{enumerate}
+    \item How can a unified, differentiable loss function be architected to concurrently compute and penalize classification accuracy loss, demographic fairness disparities, and computational energy efficiency proxies within a single gradient descent step?
+    \item To what extent can a decoupled, ``human-in-the-loop'' interactive system continuously inject real-time constraints directly into a live PyTorch training thread without disrupting backpropagation integrity, causing deadlocks, or corrupting dataset batches?
+    \item How do fundamentally distinct architectural complexities—ranging from simple linear regressions to deep convolutional vision networks processing high-dimensional tensors—manifest and respond to these dynamic trade-off shifts in real-time?
+\end{enumerate}
+
+\subsection{Research Objectives}
+The primary aim of this dissertation is to design, implement, and rigorously evaluate an interactive Multi-Objective Optimization training system. The specific objectives are:
+\begin{itemize}
+    \item \textbf{Mathematical Formulation:} To derive a single composite loss function aggregating Binary Cross-Entropy (BCE) for accuracy, continuous Demographic Parity Difference (DPD) proxies for fairness, and $L_2$ parameter density regularizations for estimating energy draw.
+    \item \textbf{Systems Engineering:} To develop an advanced, asynchronous ``Triple-Tier'' architecture consisting of a low-latency web-based control dashboard, an asynchronous REST API middleware orchestrator, and a modular multi-threaded PyTorch training backend.
+    \item \textbf{Empirical Evaluation:} To deploy and quantitatively benchmark this system across established tabular fairness datasets (Adult Census Income) and high-dimensional image processing scenarios (Synthetic Vision Tensors).
+\end{itemize}
+
+\subsection{Scope of the Study}
+This research focuses specifically on balancing accuracy, ethical parity, and physical energy usage constraints. The operational boundaries are defined as follows:
+\begin{itemize}
+    \item \textbf{Fairness Definitions:} Fairness is scoped strictly and defined mathematically as Statistical/Demographic Parity regarding a single binary protected attribute.
+    \item \textbf{Model Complexity:} The evaluation is constrained to three distinct archetypes: Logistic Regression, Deep Neural Networks (DNN), and ResNet-18.
+    \item \textbf{Energy Tracking:} Energy profiling relies on software heuristics using CPU/GPU telemetry via the \texttt{psutil} library and TDP hardware estimates.
+\end{itemize}
+
+\subsection{Significance of the Study}
+By transforming Multi-Objective Optimization from a static, pre-training requirement into an active, interactive steering mechanism, this research fundamentally alters the paradigm of model deployment. It empowers data scientists, sociologists, and ethicists to iteratively shape an AI's trajectory as it learns. This framework directly aligns technical AI development with the broader, urgent societal demands for ``Green AI'' practices and transparent, accountable algorithmic governance.
+
+\section{Related Work}
+
+\subsection{Algorithmic Fairness and Bias Mitigation}
+The mitigation of embedded algorithmic bias is traditionally categorized by the phase of the machine learning pipeline:
+\begin{itemize}
+    \item \textbf{Pre-processing:} Transforming data representations before training (e.g., re-weighting or synthesizing fair latent spaces).
+    \item \textbf{In-processing:} Modifying the learning algorithm directly during training iterations (e.g., adversarial unlearning or custom loss penalties).
+    \item \textbf{Post-processing:} Re-calibrating final probability output thresholds to force parity across groups after convergence.
+\end{itemize}
+This study aligns exclusively with \textbf{in-processing} techniques.
+
+\subsection{Green AI and Energy-Aware Computing}
+While ``Red AI'' historically chased absolute accuracy regardless of cost, ``Green AI'' advocates for efficiency as a key metric.
+\begin{itemize}
+    \item \textbf{Measurement Frameworks:} Tools such as PyJoules and CodeCarbon utilize APIs like Intel's RAPL or NVIDIA's NVML to track energy consumption. 
+    \item \textbf{The Retrospective Gap:} Most tools are post-mortem. There is a lack of frameworks utilizing real-time energy telemetry as an active loss-function penalizer to guide gradient descent.
+\end{itemize}
+
+\subsection{Multi-Objective Optimization (MOO) in ML}
+Traditional MOO relies heavily on evolutionary approaches or scalar mathematical aggregations:
+\begin{itemize}
+    \item \textbf{Weighted Sum Scalarization:} Aggregating multiple distinct objective functions into a single scalar value ($L = w_1f_1 + w_2f_2$).
+    \item \textbf{Pareto Frontiers and NSGA-II:} Maintaining a population of models to generate an optimal boundary curve.
+    \item \textbf{The Static Wall Gap:} Neither approach allows for mid-training adjustments on a single instantiated neural network thread.
+\end{itemize}
+
+\subsection{Interactive Machine Learning (IML)}
+IML leverages Human-in-the-Loop (HITL) principles, operating on the premise that human intuition and domain expertise can outpace raw automated searches. While common in Active Learning and RLHF, its application in dynamically steering deep mathematical loss functions remains underexplored.
+
+\subsection{Research Gaps: A Synthesis}
+The primary literature gap is the lack of real-time responsiveness. There is a critical need for an interactive, live-steerable system that balances accuracy, ethical constraints, and physical hardware energy consumption simultaneously while actively learning.
+
+\section{Research Methodology \& System Architecture}
+
+\subsection{High-Level System Architecture (The ``Triple-Tier'' Design)}
+To facilitate strict interactivity without interrupting the rigorous mathematical computations of deep learning, the system was decoupled into a highly asynchronous ``Triple-Tier'' architecture.
+
+\subsubsection{Tier 1: Frontend (Streamlit Dashboard and Control Tower)}
+The frontend serves as the visual surveillance hub. Built with a lightweight client-side footprint, the dashboard renders live telemetry via Chart.js.
+\begin{itemize}
+    \item \textbf{State Management:} The Javascript client initiates asynchronous interval polling at 1000ms intervals.
+    \item \textbf{Execution Overrides:} The UI provides overrides including \texttt{Pause}, \texttt{Resume}, and \texttt{Terminate Instance}.
+    \item \textbf{Real-Time Parameter Injection:} Sliders map to underlying loss constraints: $w_{accuracy}, w_{fairness}, w_{energy}$.
+\end{itemize}
+
+\subsubsection{Tier 2: Middleware (FastAPI Asynchronous Orchestrator)}
+The middleware layer acts as the critical bridge. It handles model instantiation and explicitly delegates the training loop to dedicated \texttt{BackgroundTasks} execution threads. It maintains thread-safe messaging brokers using Python's \texttt{queue.Queue()} structure.
+
+\subsubsection{Tier 3: Backend (PyTorch Modular Training Engine)}
+The backend orchestrates the heavy mathematical lifting. The engine executes a continuous internal queue polling cycle. Between processing mini-batches, the thread checks the queue for parameter updates, allowing it to update loss multipliers mid-epoch without restarting the process.
+
+\subsection{Architecture Diagram}
+
+\begin{figure}[h]
+    \centering
+    \fbox{\begin{minipage}{0.8\textwidth}
+        \centering
+        \vspace{1cm}
+        [Architecture Diagram: Frontend $\leftrightarrow$ FastAPI Middleware $\leftrightarrow$ PyTorch Backend]
+        \vspace{1cm}
+    \end{minipage}}
+    \caption{The Triple-Tier Interactive Architecture Flow. \textbf{Left:} The HTML/JS Dashboard. \textbf{Center:} The Async FastAPI Orchestrator. \textbf{Right:} The isolated PyTorch Engine threads.}
+    \label{fig:triple_tier_architecture}
+\end{figure}
+
+\subsection{Modular Implementation and Decoupling}
+
+\subsubsection{Data Handling Refactor: data\_loader.py and DataLoader Mechanics}
+The data operations were decoupled into a dedicated pipeline using PyTorch \texttt{Dataset} and \texttt{DataLoader} classes, enabling Mini-Batch Stochastic Gradient Descent (SGD) and providing granular ``pulse points'' for interactivity.
+
+\subsection{Dataset Characteristics and Preprocessing Pipelines}
+Two disparate dataset paradigms were implemented to test the engine's limits:
+\begin{itemize}
+    \item \textbf{Tabular Data (Adult Census):} Processed using \texttt{StandardScaler} and \texttt{OneHotEncoder}. Sensitive attribute 'Sex' is isolated for fairness calculation.
+    \item \textbf{Vision Data (SyntheticVisionDataset):} A custom generator streaming $3 \times 64 \times 64$ tensors to simulate heavy Convolutional processing loops and hardware stress.
+\end{itemize}
+
+\subsection{Model Diversity and Algorithmic Complexity}
+\begin{enumerate}
+    \item \textbf{Logistic Regression (Linear):} A single fully-connected (\texttt{nn.Linear}) layer as a baseline.
+    \item \textbf{Deep Neural Networks (Non-Linear):} A multi-layer perceptron (MLP) with ReLU activations and Dropout (0.2).
+    \item \textbf{ResNet-18 (Vision):} A deep CNN containing complex skip-connections, overriding the final layer for binary sigmoid classification.
+\end{enumerate}
+
+\subsection{The Multi-Objective Loss Function Formulation}
+The mathematical epicenter enabling the entire engine is the unified scalarization penalty:
+\begin{equation}
+    \text{Loss}_{total} = (w_{acc} \times L_{BCE}) + (w_{fair} \times (\mu_{priv} - \mu_{unpriv})^2) + (w_{nrg} \times \sum_{i}||\theta_i||_2)
+\end{equation}
+\begin{itemize}
+    \item \textbf{Accuracy Penalty:} Standard Binary Cross-Entropy loss.
+    \item \textbf{Fairness Penalty:} Uses the squared difference in means of probability activations for privileged vs unprivileged groups.
+    \item \textbf{Energy Regularization:} Employs $L_2$ parameter density constraints to force sparsity and reduce computational footprints.
+\end{itemize}
+
+\subsection{Interactivity Implementation Details}
+The system circumvents the ``deadlock'' dilemma by ensuring the \texttt{time.sleep(0.5)} block explicitly wraps the \texttt{process\_queues()} function. Even while paused, the thread actively listens for incoming JSON payloads from the Orchestrator.
+
+\section{Results and Analysis}
+
+\subsection{Comparative Model Performance}
+Tests demonstrated robust multi-threading. The UI tracked Adult Income DNN and ResNet-18 instances simultaneously without observable frame lags. Linear models achieved stability in seconds, while ResNet-18 required extensive epochs to effectively organize convolutional filters.
+
+\subsection{Fairness Trade-off Analysis in Active Environments}
+Manual user interactions confirmed the theoretical trade-off theorems:
+\begin{itemize}
+    \item \textbf{Baseline State:} High bias observed when $w_{fairness} = 0$.
+    \item \textbf{Intervention Velocity:} Tuning the slider mid-training at Epoch 10 triggered an immediate drop in bias on the next batch iteration. 
+    \item \textbf{Accuracy Degradation:} Reducing bias forced a proportionate degradation in Accuracy, proving the MOO system works as intended.
+\end{itemize}
+
+\subsection{Energy Consumption Profiling}
+Hardware profiling revealed sharp differences in demands:
+\begin{itemize}
+    \item \textbf{Linear Trace:} Minimal deviation from baseline system idle states.
+    \item \textbf{Vision Spikes:} ResNet-18 caused immediate estimated power demand spikes (approximating 100W+ TDP), highlighting the environmental costs of visual classification.
+\end{itemize}
+
+\subsection{Interactivity Evaluation: Verifying the ``Change Since Tuning''}
+A ``delta tracking'' system was authored for the UI. Upon injection of new parameters, the system registers a baseline and renders continuous colored $\Delta$ deviation metrics. This verified that specific $w_{fairness}$ interventions improved parity metrics by quantifiable amounts (e.g., $+0.3201\%$) since the moment of injection.
+
+\subsection{User Interface Optimization and Reporting Efficacy}
+Converting reporting from 'per-epoch' to 'per-iteration' significantly enhanced interactivity. Automated CSV generation empowered retrospective analysis of the accuracy vs fairness trajectory.
+
+\section{Conclusion and Recommendations}
+
+\subsection{Summary of Analytical Findings}
+This research successfully deployed a Triple-Tier architecture isolating web-rendering from PyTorch mechanics. It proved that Operators can execute dynamic trade-off alterations across model complexities ranging from linear matrices to convolutional abstractions without inducing deadlocks.
+
+\subsection{Critical Analysis of Interactive Training Paradigms}
+Dynamic interactivity revolutionizes algorithmic development, allowing researchers to monitor demographic output paths and combat emerging prejudices by pulling an external slider.
+
+\subsection{Limitations of the Current Technical Scope}
+Energy profiling relies on software heuristics and static TDP assumptions rather than physical kernel-level power meters. Fairness constraints were simplified to binary Boolean groups, omitting complex intersectional definitions.
+
+\subsection{Recommendations for Future Work}
+\begin{itemize}
+    \item \textbf{Hardware Integrations:} Link with NVML APIs for raw silicon watt metrics.
+    \item \textbf{NLP Scope:} Extend the framework to process Transformer components (e.g., DistilBERT) to combat toxic linguistic association.
+    \item \textbf{Intersectional Parity:} Support multi-class intersectional constraints encompassing age, race, and gender simultaneously.
+\end{itemize}
+
+\subsection{Final Concluding Remarks}
+As AI architectures consume unparalleled energy to dictate sociological resolutions, retrospective tracking is insufficient. Live optimization interactivity merges static constraints with human oversight, ensuring a future of verifiable demographic equity and network efficiency.
+
+\newpage
+\section{Appendix}
+
+\subsection{Appendix A: Core Source Code Modular Implementations}
+\begin{enumerate}
+    \item \texttt{main.py}: Startup trigger for FastAPI and Uvicorn.
+    \item \texttt{api.py}: HTTP route handlers for JSON payload routing.
+    \item \texttt{trainer.py}: Core engine executing PyTorch backward arrays and queue polling.
+    \item \texttt{data\_loader.py}: Wrappers for dataset abstraction and DataLoader generation.
+\end{enumerate}
+
+\subsection{Appendix B: Synthetic Visual Tensor Generator Mechanics}
+\begin{lstlisting}
+num_train = 2000
+# Initializing 3-channel RGB random dimensional tensor matrices
+X_train = torch.randn(num_train, 3, 64, 64)
+# Assigning exact pseudo-protected binary integer representations
+sens_train = torch.randint(0, 2, (num_train,))
+priv_mask_train = sens_train == 1
+unpriv_mask_train = sens_train == 0
+\end{lstlisting}
+
+\end{document}
